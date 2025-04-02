@@ -7,19 +7,22 @@ import { useContext, useEffect } from "react";
 import { Toaster, toast} from "react-hot-toast";
 import { EditorContext } from "../pages/editor.pages";
 import EditorJS from "@editorjs/editorjs"
+import {tools } from "./tools.component"
 
 
 const BlogEditor = () => {
 
         
-        let { blog, blog : {title, banner, content, tags, des }, setBlog} = useContext(EditorContext);
+        let { blog, blog : {title, banner, content, tags, des }, setBlog, textEditor, setTextEditor} = useContext(EditorContext);
 
         useEffect(() =>{
-            let editor = new EditorJS({
+            setTextEditor(new EditorJS({
                 holderId:"textEditor",
                 data:'',
+                tools:tools,
+                placeholder:"let's write some intresting Blogs"
                 
-            })
+            }))
         },[])
 
         const handleBannerUpload = (e) => {
@@ -68,6 +71,11 @@ const BlogEditor = () => {
        }
 
 
+       const handlePublishEvent = () => {
+
+       }
+
+
 
     return (
         <>
@@ -80,7 +88,9 @@ const BlogEditor = () => {
             </p>
 
             <div className="flex gap-4 ml-auto">
-                <button className="btn-dark py-2">
+                <button className="btn-dark py-2"
+                onClick={handlePublishEvent}
+                >
                     Publish
                 </button>
                 <button className="btn-light">
