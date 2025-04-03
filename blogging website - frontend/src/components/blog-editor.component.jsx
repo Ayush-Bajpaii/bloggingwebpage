@@ -14,12 +14,12 @@ import {tools } from "./tools.component"
 const BlogEditor = () => {
 
         
-        let { blog, blog : {title, banner, content, tags, des }, setBlog, textEditor, setTextEditor} = useContext(EditorContext);
+        let { blog, blog : {title, banner, content, tags, des }, setBlog, textEditor, setTextEditor, setEditorState} = useContext(EditorContext);
 
         useEffect(() =>{
             setTextEditor(new EditorJS({
                 holderId:"textEditor",
-                data:'',
+                data:content,
                 tools:tools,
                 placeholder:"let's write some intresting Blogs"
                 
@@ -73,6 +73,30 @@ const BlogEditor = () => {
 
 
        const handlePublishEvent = () => {
+       
+
+            if(!banner.length){
+                return toast.error("Upload a banner to publish the Blog")
+            }
+
+            if(!title.length){
+                return toast.error("Please write a Blog Title")
+            }
+
+            if(textEditor.isReady){
+                textEditor.save().then(data => {
+                    if(data.blocks.length){
+                        setBlog({...blog, content:data});
+                        setEditorState("publish")
+                    }
+                    else{
+                        return toast.error("Write something in Blog to publish")
+                    }
+                })
+                .catch((err) => {
+                    console.log(err);
+                })
+            }
 
        }
 
@@ -131,6 +155,7 @@ const BlogEditor = () => {
                 </div>
 
                 <textarea
+                defaultValue={title}
                 placeholder="Blog Title"
                 className="text-4xl font-medium w-full h-20 outline-none resize-none mt-10 leading-tight placeholder:opacity-40"
                 onKeyDown={handleTitlekeyDown}
