@@ -234,20 +234,25 @@ server.post("/signup", (req,res) =>{
             let { title, des, banner, tags, content, draft } = req.body;
 
             if(!title.length){
-                return res.status(4013).json({error:"You must provide  title to publish the blog"})
+                return res.status(4013).json({error:"You must provide  title"}) 
             }
-            if(!des.length || des.length > 200){
-                return res.status(403).json({error:"You must provide the description under 200 character"})
+
+            if(!draft){
+                if(!des.length || des.length > 200){
+                    return res.status(403).json({error:"You must provide the description under 200 character"})
+                }
+                if(!banner.length){
+                    return res.status(403).json({error:"You must provide the blog banner to publish it"})
+                }
+                if(!content.blocks.length){
+                    return res.status(403).json({error:"There must be some blog content to publish it"})
+                }
+                if(!tags.length){
+                    return res.status(403).json({error:"Provide the tags in order to publish the Blog"})
+                }
+
             }
-            if(!banner.length){
-                return res.status(403).json({error:"You must provide the blog banner to publish it"})
-            }
-            if(!content.blocks.length){
-                return res.status(403).json({error:"There must be some blog content to publish it"})
-            }
-            if(!tags.length){
-                return res.status(403).json({error:"Provide the tags in order to publish the Blog"})
-            }
+            
             tags = tags.map(tag => tag.toLowerCase());
             let blog_id = title.replace(/[^a-zA-Z0-9]/g, ' ').replace(/\s+/g, "-").trim() + nanoid();
 
@@ -267,7 +272,7 @@ server.post("/signup", (req,res) =>{
                     return res.status(500).json({error: err.message})
                 })
             })
-            
+
           })
 
 server.listen(PORT,() => {
