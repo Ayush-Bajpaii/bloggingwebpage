@@ -32,8 +32,8 @@ const BlogPostCard = ({content, author}) => {
             </div>
         </div>
 
-        <div className="h-28 aspect-square bg-grey ">
-            <img src={banner} className="w-full h-full aspect-square object-cover"/>
+        <div className="h-28 aspect-square bg-grey rounded-2xl">
+            <img src={banner} className="w-full h-full aspect-square object-cover rounded-2xl"/>
         </div>
         </Link>
          
