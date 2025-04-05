@@ -20,7 +20,7 @@ const App = () => {
 
     }, [])
 
-    console.log("App - userAuth:", userAuth); 
+   // console.log("App - userAuth:", userAuth); 
 
     return (
         <UserContext.Provider value={{userAuth , setUserAuth}}>
