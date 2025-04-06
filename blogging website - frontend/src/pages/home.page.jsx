@@ -6,6 +6,8 @@ import Loader from "../components/loader.component"
 import BlogPostCard from "../components/blog-post.component";
 import MinimalBlogPost from "../components/nobanner-blog-post.component";
 import { activeTabRef } from "../components/inpage-navigation.component";
+import NoDataMessage from "../components/nodata.component";
+import { filterPaginationData } from "../common/filter-pagination-data";
 
 const HomePage = () => {
 
@@ -14,10 +16,31 @@ const HomePage = () => {
     let [trendingBlogs, setTrendingBlog] = useState(null);
     let [pageState, setPageState] = useState("home");
 
-    let categories = ["programming", "hollywood", "film making", "social media", "cooking", "fetch", "tech", "finances", "travel", "politics", "A.I"]
+    let categories = ["programming", "Mountains", "Trees", "Fishing", "Ai", "tech", "Business", "Earth", "Alien"]
 
-    const fetchLatestBlog = () => {
-        axios.get(import.meta.env.VITE_SERVER_DOMAIN + "/latest-blogs")
+    const fetchLatestBlogs = (page = 1) => {
+        axios.post(import.meta.env.VITE_SERVER_DOMAIN + "/latest-blogs", { page })
+            .then( async ({ data }) => {
+                console.log(data.blogs)
+
+                let formatedData = await filterPaginationData({
+                    state: blogs,
+                    data: data.blogs,
+                    page,
+                    countRoute: "/all-latest-blogs-count"
+
+                })
+                console.log(formatedData)
+                setBlog(formatedData)
+            })
+            .catch(err => {
+                console.log(err)
+            })
+    }
+
+
+    const fetchBlogsBycategory = () => {
+        axios.post(import.meta.env.VITE_SERVER_DOMAIN + "/search-blogs", { tag: pageState })
             .then(({ data }) => {
                 setBlog(data.blogs)
             })
@@ -26,7 +49,7 @@ const HomePage = () => {
             })
     }
 
-    const fetchtrendingBlog = () => {
+    const fetchTrendingBlog = () => {
         axios.get(import.meta.env.VITE_SERVER_DOMAIN + "/trending-blogs")
             .then(({ data }) => {
                 setTrendingBlog(data.blogs)
@@ -40,7 +63,7 @@ const HomePage = () => {
         let category = e.target.innerText.toLowerCase();
         setBlog(null);
 
-        if(pageState == category){
+        if (pageState === category) {
             setPageState("home");
             return;
         }
@@ -53,13 +76,15 @@ const HomePage = () => {
 
         activeTabRef.current.click();
 
-        if(pageState == "home"){
-            fetchLatestBlog();
+        if (pageState == "home") {
+            fetchLatestBlogs();
 
+        } else {
+            fetchBlogsBycategory();
         }
 
-        if(!trendingBlogs){
-            fetchtrendingBlog();
+        if (!trendingBlogs) {
+            fetchTrendingBlog();
 
         }
     }, [pageState])
@@ -73,23 +98,31 @@ const HomePage = () => {
 
                         <>
                             {
-                                blogs == null ? <Loader /> :
-                                    blogs.map((blog, i) => {
-                                        return <AnimationWrapper transition={{ duration: 1, delay: i * .1 }} key={i}>
-                                            <BlogPostCard content={blog} author={blog.author.personal_info} />
-                                        </AnimationWrapper>
-                                    })
+                                blogs == null ? (<Loader />) :
+                                    (blogs.results.length ?
+                                        blogs.results.map((blog, i) => {
+                                            return (
+                                                <AnimationWrapper transition={{ duration: 1, delay: i * .1 }} key={i}>
+                                                    <BlogPostCard content={blog} author={blog.author.personal_info} />
+                                                </AnimationWrapper>
+                                            );
+                                        })
+                                        : <NoDataMessage message="No Blogs Published" />
+                                    )
                             }
                         </>
 
                         {
-                            trendingBlogs == null ? <Loader /> :
-                                trendingBlogs.map((blog, i) => {
-                                    return <AnimationWrapper transition={{ duration: 1, delay: i * .1 }} key={i}>
-                                        <MinimalBlogPost blog={blog} index={i} />
-                                    </AnimationWrapper>
-                                })
-                        }
+                            trendingBlogs == null ? (<Loader />) : (
+                                trendingBlogs.length ?
+                                    trendingBlogs.map((blog, i) => {
+                                        return (<AnimationWrapper transition={{ duration: 1, delay: i * .1 }} key={i}>
+                                            <MinimalBlogPost blog={blog} index={i} />
+                                        </AnimationWrapper>
+                                        )
+                                    })
+                                    : <NoDataMessage message="No Trendings Blogs" />
+                            )}
 
                     </InPageNavigation>
                 </div>
@@ -107,7 +140,8 @@ const HomePage = () => {
                                     categories.map((category, i) => {
                                         return <button
                                             onClick={loadBlogByCategory}
-                                             className={"tag " + (pageState == category ? " bg-black text-white " : " ")}
+                                            className={"tag " + (pageState === category.toLowerCase()
+                                                ? " bg-black text-white " : " ")}
                                             key={i}>
                                             {category}
                                         </button>
@@ -118,16 +152,19 @@ const HomePage = () => {
                         </div>
 
                         <div>
-                            <h1 className="font-medium text-xl mb-8">Trending  <i className="fi fi-br-arrow-trend-up"></i></h1>
+                            <h1 className="font-medium text-xl mb-8">Trending
+                                <i className="fi fi-br-arrow-trend-up"></i></h1>
 
                             {
-                                trendingBlogs == null ? <Loader /> :
-                                    trendingBlogs.map((blog, i) => {
-                                        return <AnimationWrapper transition={{ duration: 1, delay: i * .1 }} key={i}>
-                                            <MinimalBlogPost blog={blog} index={i} />
-                                        </AnimationWrapper>
-                                    })
-                            }
+                                trendingBlogs == null ? (<Loader />) : (
+                                    trendingBlogs.length ?
+                                        trendingBlogs.map((blog, i) => {
+                                            return (<AnimationWrapper transition={{ duration: 1, delay: i * .1 }} key={i}>
+                                                <MinimalBlogPost blog={blog} index={i} />
+                                            </AnimationWrapper>)
+                                        })
+                                        : <NoDataMessage message="No Trendings Blogs" />
+                                )}
                         </div>
 
                     </div>
