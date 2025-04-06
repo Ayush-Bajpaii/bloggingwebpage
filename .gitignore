@@ -70,6 +70,8 @@ server/.env
 
 server/blogwebsite-79574-firebase-adminsdk-fbsvc-f114d3e651.json
 blogging website - frontend/.env
+blogging website - frontend/*.json
+
 
 server/*.json
 .env
