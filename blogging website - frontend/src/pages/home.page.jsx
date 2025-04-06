@@ -66,9 +66,9 @@ const HomePage = () => {
 
     return (
         <AnimationWrapper>
-            <section className="h-cover flex justify-center gap-10">
+            <section className="hh-cover flex flex-col md:flex-row justify-center gap-6 px-4 sm:px-6 md:px-8 py-4">
                 {/* latest blog */}
-                <div className="w-full">
+                <div className="w-full md:w-2/3 pl-6">
                     <InPageNavigation routes={[pageState, "trending blogs"]} defaultHidden={["trending blogs"]}>
 
                         <>
@@ -96,7 +96,7 @@ const HomePage = () => {
 
                 {/* {filters and trending blogs } */}
 
-                <div className="min-w-[40%] lg:min-w-[400px] max-w-min border-l  border-grey pl-8 pt-3 max-hd:hidden">
+                <div className="w-full md:w-1/3 lg:w-2/5 md:max-w-[350px] lg:max-w-[400px] border-l border-grey pl-0 md:pl-6 pt-3">
                     <div className="flex flex-col gap-10 ">
                         <div>
 
