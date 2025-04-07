@@ -1,6 +1,6 @@
 // navbar.component.jsx
 import { useContext, useState } from "react";
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useNavigate } from "react-router-dom";
 import logo from "../imgs/logo.png";
 import { UserContext } from "../App";
 import UserNavigationPanel from "./user-navigation.component";
@@ -8,11 +8,24 @@ import UserNavigationPanel from "./user-navigation.component";
 const Navbar = () => {
   const [searchBoxVisibility, setSearchBoxVisibility] = useState(false);
   const [userNavPanel, setUserNavPanel] = useState(false);
+
+  let navigate = useNavigate();
+
   const { userAuth: { access_token, profile_img } } = useContext(UserContext);
+  
 
   const handleUserNavPanel = () => {
     setUserNavPanel((currentVal) => !currentVal);
   };
+
+  const handleSearch = (e) => {
+    let query = e.target.value;
+    console.log(e)
+    if(e.keyCode == 13 && query.length){
+      navigate(`/search/${query}`);
+
+    }
+  }
 
   const handleBlur = () => {
     setTimeout(() => {
@@ -38,6 +51,7 @@ const Navbar = () => {
               type="text"
               placeholder="Search"
               className="w-full md:w-auto bg-gray-100 p-4 pl-6 pr-12 rounded-full placeholder:text-gray-600 md:pl-12 focus:outline-none focus:ring-4 focus:ring-blue-400/50 transition-all duration-300 shadow-md hover:bg-gray-200"
+              onKeyDown={handleSearch}
             />
             <i className="fi fi-rr-search absolute right-6 md:pointer-events-none top-1/2 -translate-y-1/2 text-2xl text-gray-500 transition-all duration-300 hover:text-gray-700"></i>
           </div>

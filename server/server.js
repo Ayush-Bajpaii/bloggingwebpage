@@ -281,10 +281,19 @@ server.post("/all-latest-blogs-count" , (req,res) => {
 
 server.post("/search-blogs", (req, res) => {
 
-    let { tag,page } = req.body;
+    let { tag,query,page } = req.body;
 
-    let findQuerry = { tags: tag, draft: false };
+    let findQuerry;
+
+    if(tag){
+        findQuerry = { tags: tag, draft: false };
+    }else if (query){
+         findQuerry = {draft: false, title: new RegExp(query, 'i')}
+    }
+
     let maxLimit = 4;
+
+
     Blog.find(findQuerry)
         .populate("author", "personal_info.profile_img personal_info.username personal_info.fullname -_id")
         .sort({ "publishedAt": -1 })
@@ -299,8 +308,15 @@ server.post("/search-blogs", (req, res) => {
 })
 
  server.post("/search-blogs-count", (req,res) => {
-    let {tag} = req.body;
-    let findQuerry = { tags: tag, draft: false };
+    let {tag, query} = req.body;
+    let findQuerry;
+
+    if(tag){
+        findQuerry = { tags: tag, draft: false };
+    }else if (query){
+         findQuerry = {draft: false, title: new RegExp(query, 'i')}
+    }
+
     Blog.countDocuments(findQuerry)
     .then(count => {
         return res.status(200).json({totalDocs: count})
