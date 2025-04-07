@@ -8,11 +8,13 @@ import LoadMoreDataBtn from "../components/load-more.component";
 import BlogPostCard from "../components/blog-post.component";
 import { filterPaginationData } from "../common/filter-pagination-data";
 import axios from "axios";
+import UserCard from "../components/usercard.component";
 
 const SearchPage = () => {
 
     let { query } = useParams();
     let [blogs, setBlog] = useState(null);
+    let [ users, setUsers] = useState(null);
 
     const searchBlogs = ({ page = 1, create_new_arr = false }) => {
         axios.post(import.meta.env.VITE_SERVER_DOMAIN + "/search-blogs", { query, page })
@@ -34,19 +36,49 @@ const SearchPage = () => {
             })
     }
 
+    const fetchUsers = () => {
+        axios.post(import.meta.env.VITE_SERVER_DOMAIN + "/search-users ", {query})
+        .then(({data: {users}}) => {
+            setUsers(users);
+        })
+    }
+
+
     useEffect(() => {
         resetState();
         searchBlogs({page:1, create_new_arr:true});
+        fetchUsers();
     },[query])
 
     const resetState = () => {
-        setBlog(null)
+        setBlog(null);
+        setUsers(null);
     }
+
+    const UserCardWrapper = () => {
+        return (
+            <>
+                {
+                    users == null ? <Loader/> :
+                    users.length ? 
+                        users.map((user, i) =>{
+                            return  <AnimationWrapper key={i} transition={{duration:1, delay: i*0.08}}>
+                                <UserCard user={user}/>
+                            </AnimationWrapper>
+                        })
+                        : <NoDataMessage message="No user found"/>
+                }
+            </>
+        )
+    }
+
+
 
     return (
         <section className="h-cover flex justify-center gap-10">
             <div className="w-full">
-                <InPageNavigation routes={[`Search results from ${query}`, "Accounts Matched"]} defaultHidden={["Accounts Matched"]}>
+                <InPageNavigation routes={[`Search results from ${query}`, "Accounts Matched"]} defaultHidden=
+                {["Accounts Matched"]}>
                     <>
                         {
                             blogs == null ? (<Loader />) :
@@ -64,6 +96,7 @@ const SearchPage = () => {
 
                     </>
 
+                                <UserCardWrapper />
                 </InPageNavigation>
             </div>
 

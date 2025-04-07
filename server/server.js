@@ -329,6 +329,24 @@ server.post("/search-blogs", (req, res) => {
 })
 
 
+server.post("/search-users", (req,res) => {
+    let { query } = req.body;
+    User.find({
+        $or: [
+            { "personal_info.username": new RegExp(query, 'i') },
+            { "personal_info.fullname": new RegExp(query, 'i') }
+        ]})
+    .limit(50)
+    .select("personal_info.profile_img personal_info.username personal_info.fullname -_id")
+    .then(users => {
+        return res.status(200).json({users})
+    })
+    .catch(err => {
+        return res.status(500).json({error: err.message})
+    })
+})
+
+
 
 
 server.post('/create-blog', verifyJWT, (req, res) => {
