@@ -8,6 +8,7 @@ import MinimalBlogPost from "../components/nobanner-blog-post.component";
 import { activeTabRef } from "../components/inpage-navigation.component";
 import NoDataMessage from "../components/nodata.component";
 import { filterPaginationData } from "../common/filter-pagination-data";
+import LoadMoreDataBtn from "../components/load-more.component";
 
 const HomePage = () => {
 
@@ -18,10 +19,9 @@ const HomePage = () => {
 
     let categories = ["programming", "Mountains", "Trees", "Fishing", "Ai", "tech", "Business", "Earth", "Alien"]
 
-    const fetchLatestBlogs = (page = 1) => {
+    const fetchLatestBlogs = ({ page = 1 }) => {
         axios.post(import.meta.env.VITE_SERVER_DOMAIN + "/latest-blogs", { page })
-            .then( async ({ data }) => {
-                console.log(data.blogs)
+            .then(async ({ data }) => {
 
                 let formatedData = await filterPaginationData({
                     state: blogs,
@@ -30,7 +30,6 @@ const HomePage = () => {
                     countRoute: "/all-latest-blogs-count"
 
                 })
-                console.log(formatedData)
                 setBlog(formatedData)
             })
             .catch(err => {
@@ -39,10 +38,18 @@ const HomePage = () => {
     }
 
 
-    const fetchBlogsBycategory = () => {
-        axios.post(import.meta.env.VITE_SERVER_DOMAIN + "/search-blogs", { tag: pageState })
-            .then(({ data }) => {
-                setBlog(data.blogs)
+    const fetchBlogsBycategory = ({ page = 1 }) => {
+        axios.post(import.meta.env.VITE_SERVER_DOMAIN + "/search-blogs", { tag: pageState, page })
+            .then(async ({ data }) => {
+                let formatedData = await filterPaginationData({
+                    state: blogs,
+                    data: data.blogs,
+                    page,
+                    countRoute: "/search-blogs-count",
+                   data_to_send:{tag:pageState} 
+
+                })
+                setBlog(formatedData)
             })
             .catch(err => {
                 console.log(err)
@@ -77,10 +84,10 @@ const HomePage = () => {
         activeTabRef.current.click();
 
         if (pageState == "home") {
-            fetchLatestBlogs();
+            fetchLatestBlogs({ page: 1 });
 
         } else {
-            fetchBlogsBycategory();
+            fetchBlogsBycategory({page:1});
         }
 
         if (!trendingBlogs) {
@@ -108,8 +115,8 @@ const HomePage = () => {
                                             );
                                         })
                                         : <NoDataMessage message="No Blogs Published" />
-                                    )
-                            }
+                                    )}
+                            <LoadMoreDataBtn state={blogs} fetchDataFun={(pageState == "home" ? fetchLatestBlogs : fetchBlogsBycategory)} />
                         </>
 
                         {
