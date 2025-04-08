@@ -102,9 +102,9 @@ const UserAuthForm = ({ type }) => {
             if (!emailRegex.test(email)) {
                 return toast.error("Invalid Email");
             }
-            if (!passwordRegex.test(password)) {
-                return toast.error("Password should be 6 to 20 characters long with a numeric, 1 lowercase and 1 uppercase letter");
-            }
+            // if (!passwordRegex.test(password)) {
+            //     return toast.error("Password should be 6 to 20 characters long with a numeric, 1 lowercase and 1 uppercase letter");
+            // }
         }
 
         // Validate OTP for signup
