@@ -9,26 +9,31 @@ import cors from "cors";
 import admin from "firebase-admin";
 import { createRequire } from "module";
 import aws from "aws-sdk";
-import Blog from "./Schema/Blog.js"
-
-
+import Blog from "./Schema/Blog.js";
+import nodemailer from "nodemailer";
+import otpGenerator from "otp-generator";
+import dns from "dns";
+import { promisify } from "util";
 
 const require = createRequire(import.meta.url);
 const serviceAccountKey = require("./blogwebsite-79574-firebase-adminsdk-fbsvc-f114d3e651.json");
 import { getAuth } from "firebase-admin/auth";
 
-
-
-
-
 const server = express();
 let PORT = 3000;
 
+// Promisify dns.resolve for async/await
+const resolveMx = promisify(dns.resolveMx);
+
+// In-memory storage for OTPs (use Redis or MongoDB for production)
+const otpStorage = new Map();
+
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccountKey)
-})
+});
 
-let emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+// Stricter email regex (from second file)
+let emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 let passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,20}$/;
 
 server.use(express.json());
@@ -36,341 +41,416 @@ server.use(cors());
 
 mongoose.connect(process.env.DB_LOCATION, {
     autoIndex: true
-})
+});
 
-//setting up s3 bucket
-const s3 = new aws.S3({
-    region: 'ap-south-1',
-    accessKeyId: process.env.AWS_ACCESS_KEY,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-})
+// Nodemailer setup (Gmail) - from second file
+const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
 
+// Generate and send OTP - from second file
+const sendOTP = async (email) => {
+    const otp = otpGenerator.generate(6, { upperCaseAlphabets: false, specialChars: false });
+    otpStorage.set(email, { otp, expires: Date.now() + 10 * 60 * 1000 }); // OTP expires in 10 minutes
 
-const generateUploadURL = async () => {
-    const date = new Date();
-    const imageName = `${nanoid()}-${date.getTime()}.jpeg`
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: "Email Verification OTP",
+        text: `Your OTP for email verification is: ${otp}. It expires in 10 minutes.`
+    };
 
-    return await s3.getSignedUrlPromise('putObject', {
-        Bucket: 'blogging-webpage',
-        Key: imageName,
-        Expires: 1000,
-        ContentType: "image/jpeg"
-    })
+    await transporter.sendMail(mailOptions);
+    return otp;
+};
 
-}
+// Verify OTP - from second file
+const verifyOTP = (email, otp) => {
+    const stored = otpStorage.get(email);
+    if (!stored) return { valid: false, error: "OTP not found or expired" };
+    if (stored.expires < Date.now()) {
+        otpStorage.delete(email);
+        return { valid: false, error: "OTP expired" };
+    }
+    if (stored.otp !== otp) return { valid: false, error: "Invalid OTP" };
+    otpStorage.delete(email);
+    return { valid: true };
+};
 
+// Function to verify email domain existence - from second file
+const verifyEmailDomain = async (email) => {
+    const domain = email.split('@')[1];
+    try {
+        const mxRecords = await resolveMx(domain);
+        return mxRecords && mxRecords.length > 0;
+    } catch (err) {
+        console.error(`DNS lookup failed for ${domain}:`, err.message);
+        return false;
+    }
+};
+
+// Middleware and utility functions (common in both files)
 const verifyJWT = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(" ")[1];
-
     if (token == null) {
-        return res.status(401).json({ error: "No access token" })
+        return res.status(401).json({ error: "No access token" });
     }
     jwt.verify(token, process.env.SECRET_ACCESS_KEY, (err, user) => {
         if (err) {
-            return res.status(401).json({ error: "Access token is invalid" })
+            return res.status(401).json({ error: "Access token is invalid" });
         }
-
         req.user = user.id;
         next();
-    })
-}
-
+    });
+};
 
 const formatDatatoSend = (user) => {
-    const access_token = jwt.sign({ id: user._id }, process.env.SECRET_ACCESS_KEY)
-
+    const access_token = jwt.sign({ id: user._id }, process.env.SECRET_ACCESS_KEY);
     return {
         access_token,
         profile_img: user.personal_info.profile_img,
         username: user.personal_info.username,
         fullname: user.personal_info.fullname
-    }
-}
+    };
+};
 
 const generateUsername = async (email) => {
     let username = email.split("@")[0];
-
-    let isUsernameNotUnique = await User.exists({ "personal_info.username": username }).then((result) => result)
+    let isUsernameNotUnique = await User.exists({ "personal_info.username": username }).then((result) => result);
     isUsernameNotUnique ? username += nanoid().substring(0, 5) : "";
     return username;
 };
 
+// S3 setup (common in both files)
+const s3 = new aws.S3({
+    region: 'ap-south-1',
+    accessKeyId: process.env.AWS_ACCESS_KEY,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+});
 
-//upload image url route
+const generateUploadURL = async () => {
+    const date = new Date();
+    const imageName = `${nanoid()}-${date.getTime()}.jpeg`;
+    return await s3.getSignedUrlPromise('putObject', {
+        Bucket: 'blogging-webpage',
+        Key: imageName,
+        Expires: 1000,
+        ContentType: "image/jpeg"
+    });
+};
+
+// Routes
+
+// Upload image URL route (common in both files)
 server.get('/get-upload-url', (req, res) => {
-    generateUploadURL().then(url => res.status(200).json({ uploadURL: url }))
+    generateUploadURL()
+        .then(url => res.status(200).json({ uploadURL: url }))
         .catch(err => {
             console.log(err.message);
-            return res.status(500).json({ error: err.message })
-        })
-})
+            return res.status(500).json({ error: err.message });
+        });
+});
 
-
-server.post("/signup", (req, res) => {
-    let { fullname, email, password } = req.body;
-
-    //validating the data from frontend
-    if (fullname.length < 3) {
-        return res.status(403).json({ "error": "Fullname must be atleast 3 letters long" })
+// Request OTP route - from second file
+server.post("/request-otp", async (req, res) => {
+    const { email, type } = req.body;
+    if (!email || !emailRegex.test(email)) {
+        return res.status(403).json({ error: "Invalid Email" });
     }
 
+    // Verify email domain existence
+    const isDomainValid = await verifyEmailDomain(email);
+    if (!isDomainValid) {
+        return res.status(403).json({ error: "Invalid Email" });
+    }
+
+    try {
+        const user = await User.findOne({ "personal_info.email": email });
+        
+        if (type === "sign-in") {
+            if (!user) {
+                return res.status(403).json({ error: "Email not found. Please sign up first." });
+            }
+            if (user.google_auth) {
+                return res.status(403).json({ error: "This email is registered with Google. Please use Google to sign in." });
+            }
+        } else if (type === "sign-up") {
+            if (user) {
+                return res.status(403).json({ error: "Email already exists. Please sign in instead." });
+            }
+        } else {
+            return res.status(400).json({ error: "Invalid request type" });
+        }
+
+        await sendOTP(email);
+        return res.status(200).json({ message: "OTP sent to your email" });
+    } catch (err) {
+        console.error("Error sending OTP:", err);
+        return res.status(500).json({ error: "Failed to send OTP" });
+    }
+});
+
+// Verify OTP route - from second file
+server.post("/verify-otp", (req, res) => {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+        return res.status(403).json({ error: "Email and OTP required" });
+    }
+    const result = verifyOTP(email, otp);
+    if (!result.valid) {
+        return res.status(403).json({ error: result.error });
+    }
+    return res.status(200).json({ message: "OTP verified successfully" });
+});
+
+// Signup route - from second file (with OTP)
+server.post("/signup", async (req, res) => {
+    let { fullname, email, password, otp } = req.body;
+
+    if (fullname.length < 3) {
+        return res.status(403).json({ error: "Fullname must be at least 3 letters long" });
+    }
     if (!email.length) {
-        return res.status(403).json({ "error": "Enter Email" })
+        return res.status(403).json({ error: "Enter Email" });
     }
     if (!emailRegex.test(email)) {
-        return res.status(403).json({ "error": "email is invalid" })
+        return res.status(403).json({ error: "Invalid Email" });
     }
     if (!passwordRegex.test(password)) {
-        return res.status(403).json({ "error": "Password should be 6 to 20 characters long with a numeric,1 lowercase and 1 uppercase letter" })
+        return res.status(403).json({ error: "Password should be 6 to 20 characters long with a numeric, 1 lowercase and 1 uppercase letter" });
     }
-    bcrypt.hash(password, 10, async (err, hashed_password) => {
-        let username = await generateUsername(email);
+    if (!otp) {
+        return res.status(403).json({ error: "OTP required for verification" });
+    }
 
+    const otpResult = verifyOTP(email, otp);
+    if (!otpResult.valid) {
+        return res.status(403).json({ error: otpResult.error });
+    }
+
+    bcrypt.hash(password, 10, async (err, hashed_password) => {
+        if (err) {
+            return res.status(500).json({ error: "Error hashing password" });
+        }
+        let username = await generateUsername(email);
         let user = new User({
             personal_info: { fullname, email, password: hashed_password, username }
-        })
+        });
 
-        user.save().then((u) => {
-            return res.status(200).json(formatDatatoSend(u))
-        })
+        user.save()
+            .then((u) => res.status(200).json(formatDatatoSend(u)))
             .catch(err => {
                 if (err.code == 11000) {
-                    return res.status(500).json({ "error": "E-mail already exists" })
+                    return res.status(500).json({ error: "E-mail already exists" });
                 }
+                return res.status(403).json({ error: err.message });
+            });
+    });
+});
 
-                return res.status(403).json({ "error": err.message })
-            })
-    })
-
-})
-
+// Signin route (common in both files)
 server.post("/signin", (req, res) => {
     let { email, password } = req.body;
-    User.findOne({ "personal_info.email": email }).then((user) => {
-        if (!user) {
-            return res.status(403).json({ "error": "Email not found" })
-        }
+    User.findOne({ "personal_info.email": email })
+        .then((user) => {
+            if (!user) {
+                return res.status(403).json({ "error": "Email not found" });
+            }
+            if (!user.google_auth) {
+                bcrypt.compare(password, user.personal_info.password, (err, result) => {
+                    if (err) {
+                        return res.status(403).json({ "error": "Error occurred while login, Please try again" });
+                    }
+                    if (!result) {
+                        return res.status(403).json({ "error": "Incorrect Password" });
+                    } else {
+                        return res.status(200).json(formatDatatoSend(user));
+                    }
+                });
+            } else {
+                return res.status(403).json({ "error": "Account was created using Google. Try logging in with Google" });
+            }
+        })
+        .catch(err => {
+            console.log(err.message);
+            return res.status(500).json({ "error": err.message });
+        });
+});
 
-        if (!user.google_auth) {
-            bcrypt.compare(password, user.personal_info.password, (err, result) => {
-                if (err) {
-                    return res.status(403).json({ "error": "Error occured while login, Please try again" })
-                }
-                if (!result) {
-                    return res.status(403).json({ "error": "Incorrect Password" })
-                } else {
-                    return res.status(200).json(formatDatatoSend(user))
-                }
-
-            })
-
-        }
-
-        else {
-            return res.status(403).json({ "error": "Account was created using Google.Try logging in with google" })
-        }
-
-        // console.log(user)
-        // return res.json({"status":"got user document"})
-    }).catch(err => {
-        console.log(err.message);
-        return res.status(500).json({ "error": err.message })
-    })
-
-})
-
+// Google Auth route (common in both files)
 server.post("/google-auth", async (req, res) => {
     const { access_token } = req.body;
-
-    // Validate input
     if (!access_token || typeof access_token !== "string") {
         return res.status(400).json({ error: "Invalid or missing access token" });
     }
-
-    // console.log("Received access_token:", access_token); // Debug log
-
     try {
-        // Verify Firebase ID token
         const decodedUser = await getAuth().verifyIdToken(access_token);
         const { email, name, picture } = decodedUser;
-
-        // Adjust picture size
         const profile_img = picture.replace("s96-c", "s384-c");
-
-        // Check if user exists
         let user = await User.findOne({ "personal_info.email": email })
             .select("personal_info.fullname personal_info.username personal_info.profile_img google_auth")
             .exec();
-
         if (user) {
-            // Login case
             if (!user.google_auth) {
                 return res.status(403).json({
-                    error: "This email was signed up without Google. Please log in with password to access the account",
+                    error: "This email was signed up without Google. Please log in with password to access the account"
                 });
             }
         } else {
-            // Signup case
             const username = await generateUsername(email);
             user = new User({
                 personal_info: { fullname: name, email, profile_img, username },
-                google_auth: true,
+                google_auth: true
             });
             await user.save();
         }
-
-        // Send response
         return res.status(200).json(formatDatatoSend(user));
     } catch (err) {
-        console.error("Google auth error:", err); // Log full error for debugging
+        console.error("Google auth error:", err);
         return res.status(500).json({ error: "Failed to authenticate you. Try with another Google account" });
     }
 });
 
-
-
+// Latest Blogs route - from first file (with pagination)
 server.post('/latest-blogs', (req, res) => {
-
     let { page } = req.body;
-
-
     let maxLimit = 4;
 
     Blog.find({ draft: false })
         .populate("author", "personal_info.profile_img personal_info.username personal_info.fullname -_id")
         .sort({ "publishedAt": -1 })
-        .select("blog_id title banner title des activity tags publishedAt -_id ")
-        .skip((page-1)* maxLimit)
-        .limit(maxLimit).then(blogs => {
-            return res.status(200).json({ blogs })
+        .select("blog_id title banner title des activity tags publishedAt -_id")
+        .skip((page - 1) * maxLimit)
+        .limit(maxLimit)
+        .then(blogs => {
+            return res.status(200).json({ blogs });
         })
         .catch(err => {
-            return res.status(500).json({ error: err.message })
-        })
-})
+            return res.status(500).json({ error: err.message });
+        });
+});
 
-
-
+// Trending Blogs route - from first file (updated to fix syntax error)
 server.get('/trending-blogs', (req, res) => {
     Blog.find({ draft: false })
         .populate("author", "personal_info.profile_img personal_info.username personal_info.fullname -_id")
-        .sort({ "activity.total_reads": -1, "activity.total_likes": -1, "publishedAt:": -1 })
-        .select("blog-id title publishedAt -_id")
+        .sort({ "activity.total_reads": -1, "activity.total_likes": -1, "publishedAt": -1 }) // Fixed syntax
+        .select("blog_id title publishedAt -_id")
         .limit(5)
         .then(blogs => {
-            return res.status(200).json({ blogs })
+            return res.status(200).json({ blogs });
         })
         .catch(err => {
-            return res.status(500).json({ error: err.message })
+            return res.status(500).json({ error: err.message });
+        });
+});
+
+// All Latest Blogs Count route - from first file
+server.post("/all-latest-blogs-count", (req, res) => {
+    Blog.countDocuments({ draft: false })
+        .then(count => {
+            return res.status(200).json({ totalDocs: count });
         })
+        .catch(err => {
+            console.log(err.message);
+            return res.status(500).json({ error: err.message });
+        });
+});
 
-})
-
-server.post("/all-latest-blogs-count" , (req,res) => {
-    Blog.countDocuments({draft:false})
-    .then(count => {
-        return res.status(200).json({ totalDocs: count })
-    })
-    .catch(err => {
-        console.log(err.message);
-        return res.status(500).json({error: err.message})
-    })
-})
-
-
+// Search Blogs route - from first file
 server.post("/search-blogs", (req, res) => {
+    let { tag, query, page } = req.body;
+    let findQuery;
 
-    let { tag,query,page } = req.body;
-
-    let findQuerry;
-
-    if(tag){
-        findQuerry = { tags: tag, draft: false };
-    }else if (query){
-         findQuerry = {draft: false, title: new RegExp(query, 'i')}
+    if (tag) {
+        findQuery = { tags: tag, draft: false };
+    } else if (query) {
+        findQuery = { draft: false, title: new RegExp(query, 'i') };
     }
 
     let maxLimit = 4;
 
-
-    Blog.find(findQuerry)
+    Blog.find(findQuery)
         .populate("author", "personal_info.profile_img personal_info.username personal_info.fullname -_id")
         .sort({ "publishedAt": -1 })
-        .select("blog_id title banner title des activity tags publishedAt -_id ")
+        .select("blog_id title banner title des activity tags publishedAt -_id")
         .skip((page - 1) * maxLimit)
-        .limit(maxLimit).then(blogs => {
-            return res.status(200).json({ blogs })
+        .limit(maxLimit)
+        .then(blogs => {
+            return res.status(200).json({ blogs });
         })
         .catch(err => {
-            return res.status(500).json({ error: err.message })
-        })
-})
+            return res.status(500).json({ error: err.message });
+        });
+});
 
- server.post("/search-blogs-count", (req,res) => {
-    let {tag, query} = req.body;
-    let findQuerry;
+// Search Blogs Count route - from first file
+server.post("/search-blogs-count", (req, res) => {
+    let { tag, query } = req.body;
+    let findQuery;
 
-    if(tag){
-        findQuerry = { tags: tag, draft: false };
-    }else if (query){
-         findQuerry = {draft: false, title: new RegExp(query, 'i')}
+    if (tag) {
+        findQuery = { tags: tag, draft: false };
+    } else if (query) {
+        findQuery = { draft: false, title: new RegExp(query, 'i') };
     }
 
-    Blog.countDocuments(findQuerry)
-    .then(count => {
-        return res.status(200).json({totalDocs: count})
-    })
-    .catch(err => {
-        console.log(err.message);
-        return res.status(500).json({error:err.message})
-    })
+    Blog.countDocuments(findQuery)
+        .then(count => {
+            return res.status(200).json({ totalDocs: count });
+        })
+        .catch(err => {
+            console.log(err.message);
+            return res.status(500).json({ error: err.message });
+        });
+});
 
-})
-
-
-server.post("/search-users", (req,res) => {
+// Search Users route - from first file
+server.post("/search-users", (req, res) => {
     let { query } = req.body;
     User.find({
         $or: [
             { "personal_info.username": new RegExp(query, 'i') },
             { "personal_info.fullname": new RegExp(query, 'i') }
-        ]})
-    .limit(50)
-    .select("personal_info.profile_img personal_info.username personal_info.fullname -_id")
-    .then(users => {
-        return res.status(200).json({users})
+        ]
     })
-    .catch(err => {
-        return res.status(500).json({error: err.message})
-    })
-})
+        .limit(50)
+        .select("personal_info.profile_img personal_info.username personal_info.fullname -_id")
+        .then(users => {
+            return res.status(200).json({ users });
+        })
+        .catch(err => {
+            return res.status(500).json({ error: err.message });
+        });
+});
 
-
-
-
+// Create Blog route (common in both files)
 server.post('/create-blog', verifyJWT, (req, res) => {
     let authorId = req.user;
     let { title, des, banner, tags, content, draft } = req.body;
 
     if (!title.length) {
-        return res.status(4013).json({ error: "You must provide  title" })
+        return res.status(403).json({ error: "You must provide a title" }); // Fixed status code (4013 to 403)
     }
 
     if (!draft) {
         if (!des.length || des.length > 200) {
-            return res.status(403).json({ error: "You must provide the description under 200 character" })
+            return res.status(403).json({ error: "You must provide the description under 200 characters" });
         }
         if (!banner.length) {
-            return res.status(403).json({ error: "You must provide the blog banner to publish it" })
+            return res.status(403).json({ error: "You must provide the blog banner to publish it" });
         }
         if (!content.blocks.length) {
-            return res.status(403).json({ error: "There must be some blog content to publish it" })
+            return res.status(403).json({ error: "There must be some blog content to publish it" });
         }
         if (!tags.length) {
-            return res.status(403).json({ error: "Provide the tags in order to publish the Blog" })
+            return res.status(403).json({ error: "Provide the tags in order to publish the Blog" });
         }
-
     }
 
     tags = tags.map(tag => tag.toLowerCase());
@@ -378,23 +458,22 @@ server.post('/create-blog', verifyJWT, (req, res) => {
 
     let blog = new Blog({
         title, des, banner, content, tags, author: authorId, blog_id, draft: Boolean(draft)
-    })
-    blog.save().then(blog => {
-        let incrementVal = draft ? 0 : 1;
+    });
 
-        User.findOneAndUpdate({ _id: authorId }, { $inc: { "account_info.total_posts": incrementVal }, $push: { "blogs": blog._id } }).then(user => {
-            return res.status(200).json({ id: blog.blog_id })
+    blog.save()
+        .then(blog => {
+            let incrementVal = draft ? 0 : 1;
+            User.findOneAndUpdate(
+                { _id: authorId },
+                { $inc: { "account_info.total_posts": incrementVal }, $push: { "blogs": blog._id } }
+            )
+                .then(user => res.status(200).json({ id: blog.blog_id }))
+                .catch(err => res.status(500).json({ error: "Failed to update total posts number" }));
         })
-            .catch(err => {
-                return res.status(500).json({ error: "Failed to pdate total posts number" })
-            })
-            .catch(err => {
-                return res.status(500).json({ error: err.message })
-            })
-    })
+        .catch(err => res.status(500).json({ error: err.message }));
+});
 
-})
-
-server.listen(PORT, () => {
-    console.log('Listening on port ->' + PORT);
+// Start the server (with binding to 0.0.0.0 for mobile access)
+server.listen(PORT, '0.0.0.0', () => {
+    console.log('Listening on port -> ' + PORT);
 });
