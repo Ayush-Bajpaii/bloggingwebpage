@@ -365,18 +365,18 @@ server.post("/all-latest-blogs-count", (req, res) => {
 
 // Search Blogs route - from first file
 server.post("/search-blogs", (req, res) => {
-    let { tag, query, author, page } = req.body;
+    let { tag, query, author, page, limit, eliminate_blog } = req.body;
     let findQuery;
 
     if (tag) {
-        findQuery = { tags: tag, draft: false };
+        findQuery = { tags: tag, draft: false,  blog_id: { $ne: eliminate_blog } };
     } else if (query) {
         findQuery = { draft: false, title: new RegExp(query, 'i') };
     } else if(author){
         findQuery = { author, draft: false };
     }
 
-    let maxLimit = 4;
+    let maxLimit = limit ? limit :2
 
     Blog.find(findQuery)
         .populate("author", "personal_info.profile_img personal_info.username personal_info.fullname -_id")
@@ -428,6 +428,7 @@ server.post("/search-users", (req, res) => {
         .limit(50)
         .select("personal_info.profile_img personal_info.username personal_info.fullname -_id")
         .then(users => {
+
             return res.status(200).json({ users });
         })
         .catch(err => {
@@ -446,7 +447,6 @@ server.post('/get-profile', (req,res) => {
         return res.status(200).json(user)
     })
     .catch(err => {
-        console.log(err);
         return res.status(500).json({error: err.message})
     })
 })
@@ -494,6 +494,33 @@ server.post('/create-blog', verifyJWT, (req, res) => {
         })
         .catch(err => res.status(500).json({ error: err.message }));
 });
+
+
+    server.post('/get-blog', (req,res) => {
+        let { blog_id } = req.body;
+        let incrementVal = 1;
+
+        Blog.findOneAndUpdate({blog_id}, {$inc : {"activity.total_reads": incrementVal}})
+        .populate("author", "personal_info.profile_img personal_info.username personal_info.fullname")
+        .select("blog_id title banner des content activity tags publishedAt")
+        .then(blog => {
+            User.findOneAndUpdate({"personal_info.username" : blog.author.personal_info.username}, {$inc : {"account_info.total_reads": incrementVal}
+            })
+            .catch(err => {
+                return res.status(500).json({error: err.message})
+            })
+
+
+            return res.status(200).json({blog});
+        })
+        .catch(err => {
+            return res.status(500).json({error: err.message})
+        })
+
+
+    });
+
+
 
 // Start the server (with binding to 0.0.0.0 for mobile access)
 server.listen(PORT, '0.0.0.0', () => {
