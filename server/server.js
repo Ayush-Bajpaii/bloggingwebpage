@@ -18,6 +18,7 @@ import { promisify } from "util";
 const require = createRequire(import.meta.url);
 const serviceAccountKey = require("./blogwebsite-79574-firebase-adminsdk-fbsvc-f114d3e651.json");
 import { getAuth } from "firebase-admin/auth";
+import { error } from "console";
 
 const server = express();
 let PORT = 3000;
@@ -364,13 +365,15 @@ server.post("/all-latest-blogs-count", (req, res) => {
 
 // Search Blogs route - from first file
 server.post("/search-blogs", (req, res) => {
-    let { tag, query, page } = req.body;
+    let { tag, query, author, page } = req.body;
     let findQuery;
 
     if (tag) {
         findQuery = { tags: tag, draft: false };
     } else if (query) {
         findQuery = { draft: false, title: new RegExp(query, 'i') };
+    } else if(author){
+        findQuery = { author, draft: false };
     }
 
     let maxLimit = 4;
@@ -391,14 +394,17 @@ server.post("/search-blogs", (req, res) => {
 
 // Search Blogs Count route - from first file
 server.post("/search-blogs-count", (req, res) => {
-    let { tag, query } = req.body;
+    let { tag, author,query } = req.body;
     let findQuery;
 
     if (tag) {
         findQuery = { tags: tag, draft: false };
     } else if (query) {
         findQuery = { draft: false, title: new RegExp(query, 'i') };
+    }else if(author){
+        findQuery = { author, draft: false };
     }
+
 
     Blog.countDocuments(findQuery)
         .then(count => {
@@ -428,6 +434,22 @@ server.post("/search-users", (req, res) => {
             return res.status(500).json({ error: err.message });
         });
 });
+
+server.post('/get-profile', (req,res) => {
+    let {username} =req.body;
+    User.findOne({$or: [
+        { "personal_info.username": new RegExp(username, 'i') },
+        { "personal_info.fullname": new RegExp(username, 'i') }
+    ] })
+    .select("-personal_info.password -google_auth -updatedAt -blogs")
+    .then(user => {
+        return res.status(200).json(user)
+    })
+    .catch(err => {
+        console.log(err);
+        return res.status(500).json({error: err.message})
+    })
+})
 
 // Create Blog route (common in both files)
 server.post('/create-blog', verifyJWT, (req, res) => {
