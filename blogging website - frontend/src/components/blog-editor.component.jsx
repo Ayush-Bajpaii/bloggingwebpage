@@ -1,4 +1,4 @@
-import { Link, useNavigate} from "react-router-dom";
+import { Link, useNavigate, useParams} from "react-router-dom";
 import logo from "../imgs/logo.png";
 import AnimationWrapper from "../common/page-animation";
 import defaultBanner from "../imgs/blog banner.png";
@@ -16,22 +16,25 @@ import { UserContext } from "../App";
 const BlogEditor = () => {
 
         
-        let { blog, blog : {title, banner, content, tags, des }, setBlog, textEditor, setTextEditor, setEditorState} = useContext(EditorContext);
+        let { blog, blog : {title, banner, content, tags, des }, setBlog, textEditor, setTextEditor,editorState, setEditorState} = useContext(EditorContext);
         let { userAuth: {access_token} } = useContext(UserContext);
+        let { blog_id } = useParams();
         let navigate = useNavigate(); 
 
-        useEffect(() =>{
-            if(!textEditor.isReady){
-                setTextEditor(new EditorJS({
-                    holderId:"textEditor",
-                    data:content,
-                    tools:tools,
-                    placeholder:"let's write some intresting Blogs"
-                    
-                }))
+        useEffect(() => {
+            console.log("Content on editor state change:", content);
+            if (textEditor.isReady) {
+                textEditor.destroy();
+                setTextEditor({ isReady: false });
             }
-            
-        },[])
+            const normalizedContent = Array.isArray(content) ? (content[0] || { blocks: [] }) : (content || { blocks: [] });
+            setTextEditor(new EditorJS({
+                holderId: "textEditor",
+                data: normalizedContent,
+                tools: tools,
+                placeholder: "let's write some intresting Blogs"
+            }));
+        }, [editorState, content]);
 
         const handleBannerUpload = (e) => {
             console.log(e);
@@ -126,7 +129,7 @@ const BlogEditor = () => {
                     title, banner, tags, content, des, draft:true
                 }
             
-                axios.post(import.meta.env.VITE_SERVER_DOMAIN + "/create-blog", blogObj,{
+                axios.post(import.meta.env.VITE_SERVER_DOMAIN + "/create-blog", {...blogObj,id:blog_id},{
                     headers:{
                         'Authorization': `Bearer ${access_token}`
                     }

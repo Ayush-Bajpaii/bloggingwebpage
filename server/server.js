@@ -172,7 +172,7 @@ server.post("/request-otp", async (req, res) => {
 
     try {
         const user = await User.findOne({ "personal_info.email": email });
-        
+
         if (type === "sign-in") {
             if (!user) {
                 return res.status(403).json({ error: "Email not found. Please sign up first." });
@@ -369,14 +369,14 @@ server.post("/search-blogs", (req, res) => {
     let findQuery;
 
     if (tag) {
-        findQuery = { tags: tag, draft: false,  blog_id: { $ne: eliminate_blog } };
+        findQuery = { tags: tag, draft: false, blog_id: { $ne: eliminate_blog } };
     } else if (query) {
         findQuery = { draft: false, title: new RegExp(query, 'i') };
-    } else if(author){
+    } else if (author) {
         findQuery = { author, draft: false };
     }
 
-    let maxLimit = limit ? limit :2
+    let maxLimit = limit ? limit : 2
 
     Blog.find(findQuery)
         .populate("author", "personal_info.profile_img personal_info.username personal_info.fullname -_id")
@@ -394,14 +394,14 @@ server.post("/search-blogs", (req, res) => {
 
 // Search Blogs Count route - from first file
 server.post("/search-blogs-count", (req, res) => {
-    let { tag, author,query } = req.body;
+    let { tag, author, query } = req.body;
     let findQuery;
 
     if (tag) {
         findQuery = { tags: tag, draft: false };
     } else if (query) {
         findQuery = { draft: false, title: new RegExp(query, 'i') };
-    }else if(author){
+    } else if (author) {
         findQuery = { author, draft: false };
     }
 
@@ -436,25 +436,27 @@ server.post("/search-users", (req, res) => {
         });
 });
 
-server.post('/get-profile', (req,res) => {
-    let {username} =req.body;
-    User.findOne({$or: [
-        { "personal_info.username": new RegExp(username, 'i') },
-        { "personal_info.fullname": new RegExp(username, 'i') }
-    ] })
-    .select("-personal_info.password -google_auth -updatedAt -blogs")
-    .then(user => {
-        return res.status(200).json(user)
+server.post('/get-profile', (req, res) => {
+    let { username } = req.body;
+    User.findOne({
+        $or: [
+            { "personal_info.username": new RegExp(username, 'i') },
+            { "personal_info.fullname": new RegExp(username, 'i') }
+        ]
     })
-    .catch(err => {
-        return res.status(500).json({error: err.message})
-    })
+        .select("-personal_info.password -google_auth -updatedAt -blogs")
+        .then(user => {
+            return res.status(200).json(user)
+        })
+        .catch(err => {
+            return res.status(500).json({ error: err.message })
+        })
 })
 
 // Create Blog route (common in both files)
 server.post('/create-blog', verifyJWT, (req, res) => {
     let authorId = req.user;
-    let { title, des, banner, tags, content, draft } = req.body;
+    let { title, des, banner, tags, content, draft, id } = req.body;
 
     if (!title.length) {
         return res.status(403).json({ error: "You must provide a title" }); // Fixed status code (4013 to 403)
@@ -476,49 +478,64 @@ server.post('/create-blog', verifyJWT, (req, res) => {
     }
 
     tags = tags.map(tag => tag.toLowerCase());
-    let blog_id = title.replace(/[^a-zA-Z0-9]/g, ' ').replace(/\s+/g, "-").trim() + nanoid();
-
-    let blog = new Blog({
-        title, des, banner, content, tags, author: authorId, blog_id, draft: Boolean(draft)
-    });
-
-    blog.save()
-        .then(blog => {
-            let incrementVal = draft ? 0 : 1;
-            User.findOneAndUpdate(
-                { _id: authorId },
-                { $inc: { "account_info.total_posts": incrementVal }, $push: { "blogs": blog._id } }
-            )
-                .then(user => res.status(200).json({ id: blog.blog_id }))
-                .catch(err => res.status(500).json({ error: "Failed to update total posts number" }));
+    let blog_id = id || title.replace(/[^a-zA-Z0-9]/g, ' ').replace(/\s+/g, "-").trim() + nanoid();
+    if (id) {
+        Blog.findOneAndUpdate({blog_id},{title,des,banner,tags,content,draft: draft ? draft : false})
+        .then(() => {
+            return res.status(200).json({ id: Blog.blog_id })
         })
-        .catch(err => res.status(500).json({ error: err.message }));
+        .catch(err => {
+            return res.status(500).json({ error: err.message })
+        })
+
+    } else {
+        let blog = new Blog({
+            title, des, banner, content, tags, author: authorId, blog_id, draft: Boolean(draft)
+        });
+
+        blog.save() 
+            .then(blog => {
+                let incrementVal = draft ? 0 : 1;
+                User.findOneAndUpdate(
+                    { _id: authorId },
+                    { $inc: { "account_info.total_posts": incrementVal }, $push: { "blogs": blog._id } }
+                )
+                    .then(user => res.status(200).json({ id: blog.blog_id }))
+                    .catch(err => res.status(500).json({ error: "Failed to update total posts number" }));
+            })
+            .catch(err => res.status(500).json({ error: err.message }));
+    }
 });
 
 
-    server.post('/get-blog', (req,res) => {
-        let { blog_id } = req.body;
-        let incrementVal = 1;
+server.post('/get-blog', (req, res) => {
+    let { blog_id, draft, mode } = req.body;
+    let incrementVal = mode != 'edit' ? 1 : 0;
 
-        Blog.findOneAndUpdate({blog_id}, {$inc : {"activity.total_reads": incrementVal}})
+    Blog.findOneAndUpdate({ blog_id }, { $inc: { "activity.total_reads": incrementVal } })
         .populate("author", "personal_info.profile_img personal_info.username personal_info.fullname")
         .select("blog_id title banner des content activity tags publishedAt")
         .then(blog => {
-            User.findOneAndUpdate({"personal_info.username" : blog.author.personal_info.username}, {$inc : {"account_info.total_reads": incrementVal}
+            User.findOneAndUpdate({ "personal_info.username": blog.author.personal_info.username }, {
+                $inc: { "account_info.total_reads": incrementVal }
             })
-            .catch(err => {
-                return res.status(500).json({error: err.message})
-            })
+                .catch(err => {
+                    return res.status(500).json({ error: err.message })
+                })
+
+            if (blog.draft && !draft) {
+                return res.status(500).json({ error: 'You cannot access this blog, it is a draft' })
+            }
 
 
-            return res.status(200).json({blog});
+            return res.status(200).json({ blog });
         })
         .catch(err => {
-            return res.status(500).json({error: err.message})
+            return res.status(500).json({ error: err.message })
         })
 
 
-    });
+});
 
 
 
