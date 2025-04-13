@@ -136,7 +136,7 @@ const HomePage = () => {
 
                 {/* {filters and trending blogs } */}
 
-                <div className="w-full md:w-1/3 lg:w-2/5 md:max-w-[350px] lg:max-w-[400px] border-l border-grey pl-0 md:pl-6 pt-3">
+                <div className="w-full md:w-1/3 lg:w-2/5 md:max-w-[350px] lg:max-w-[400px] md:border-l border-grey pl-0 md:pl-6 pt-3">
                     <div className="flex flex-col gap-10 ">
                         <div>
 

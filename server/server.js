@@ -14,6 +14,7 @@ import nodemailer from "nodemailer";
 import otpGenerator from "otp-generator";
 import dns from "dns";
 import { promisify } from "util";
+import Notification from "./Schema/Notification.js";
 
 const require = createRequire(import.meta.url);
 const serviceAccountKey = require("./blogwebsite-79574-firebase-adminsdk-fbsvc-f114d3e651.json");
@@ -537,6 +538,50 @@ server.post('/get-blog', (req, res) => {
 
 });
 
+
+    server.post('/like-blog' , verifyJWT, (req,res) => {
+        let user_id = req.user;
+        let { _id, islikedByUser } = req.body;
+        let incrementVal = !islikedByUser ? 1 : -1;
+
+        Blog.findOneAndUpdate({ _id,}, { $inc: { "activity.total_likes": incrementVal } })
+        .then(blog=> {
+            if(!islikedByUser){
+                let like = new Notification({
+                    type: "like",
+                    user: user_id,
+                    notification_for: blog.author,
+                    blog: _id,
+                })
+                like.save().then(notification =>{
+                    return res.status(200).json({like_by_user:true})
+                })
+            }
+            else{
+                Notification.findOneAndDelete({ user: user_id, blog: _id, type: "like" })
+                .then(() => {
+                    return res.status(200).json({ like_by_user: false })
+                })
+                .catch(err => {
+                    return res.status(500).json({ error: err.message })
+                })
+            }
+        })
+    })
+
+    server.post('/isliked-by-user', verifyJWT, (req,res) => {
+        let user_id = req.user;
+        let { _id } = req.body;
+        Notification.exists( { user: user_id, blog: _id, type: "like" })
+        .then(result => {
+            return res.status(200).json({ result })
+        })
+        .catch(err => {
+            return res.status(500).json({ error: err.message })
+        })
+
+        
+     })
 
 
 // Start the server (with binding to 0.0.0.0 for mobile access)
