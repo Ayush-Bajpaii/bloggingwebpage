@@ -10,12 +10,27 @@ const CommentCard = ({ index,leftVal,commentData }) => {
 
     let { commented_by :{ personal_info: { profile_img, fullname, username : commented_by_user} },commentedAt,comment, _id,children } = commentData;
 
-    let { blog,blog:{ comments, comments : {results: commentsArr} }  ,setBlog} = useContext(BlogContext);
+    let { blog,blog:{ comments, activity ,activity:{ total_parent_comment } ,comments : {results: commentsArr}, author :{ personal_info: { username: blog_author } } }  ,setBlog, setTotalParentCommentsLoaded} = useContext(BlogContext);
     let { userAuth:  { access_token, username } } = useContext(UserContext);
 
     let [ isReplying, setReplying ] = useState(false);
 
-    const removeCommentsCards = (startingPoint) => {
+
+    let getparentIndex = () => {
+        let startingPoint = index - 1;
+
+        try{
+            while(commentsArr[startingPoint].childern >= commentData.childrenLevel){
+                startingPoint--;
+            }
+        }catch{
+            startingPoint = undefined;
+        }
+        return startingPoint;
+
+    }
+
+    const removeCommentsCards = (startingPoint, isDelete = false) => {
         if(commentsArr[startingPoint]){
             while(commentsArr[startingPoint].childrenLevel > commentData.childrenLevel){
                 commentsArr.splice(startingPoint, 1);
@@ -24,7 +39,26 @@ const CommentCard = ({ index,leftVal,commentData }) => {
                 }
             }
         }
-        setBlog({ ...blog, comments: { results: commentsArr } });
+
+        if(isDelete){
+            let parentIndex = getparentIndex();
+            if(parentIndex != undefined){
+                commentsArr[parentIndex].childern = commentsArr[parentIndex].children.filter(child => child != _id)
+
+                if(!commentsArr[parentIndex].children.length){
+                    commentsArr[parentIndex].isReplyLoaded = false;
+                }
+            }
+            commentsArr.splice(index, 1);
+        }
+
+        if(!commentsArr.childrenLevel == 0 && isDelete){
+            setTotalParentCommentsLoaded(prevVal => prevVal - 1);
+        }
+
+        setBlog({ ...blog, comments: { results: commentsArr }, activity:{
+            ...activity, total_parent_comments: total_parent_comment - (commentData.childrenLevel == 0 && isDelete ? 1 : 0),
+        } });
 
     }
 
@@ -49,6 +83,23 @@ const CommentCard = ({ index,leftVal,commentData }) => {
             })
         }
 
+    }
+
+    const deleteComment = (e) => {
+        e.target.setAttribute("disabled", true);
+
+        axios.post(import.meta.env.VITE_SERVER_DOMAIN + "/delete-comment", { _id}, {
+            headers:{
+                'Authorization': `Bearer ${access_token}`  
+            }
+        })
+        .then(() => {
+            e.target.removeAttribute("disabled"); 
+            removeCommentsCards(index + 1,true)
+        })
+        .catch(err => {
+            console.log(err);
+        })
     }
 
 
@@ -76,7 +127,7 @@ const CommentCard = ({ index,leftVal,commentData }) => {
                     </div>
                     <p className="font-gelasio text-xl ml-3">{comment}</p>
 
-                    <div className="flex gap-5  items-center mt-5">
+                    <div className="flex gap-5 justify-between items-center mt-5">
 
                         {
                             commentData.isReplyLoaded ? 
@@ -93,6 +144,16 @@ const CommentCard = ({ index,leftVal,commentData }) => {
                     <button 
                     onClick={handleReplyClick}
                     className="underline">Reply</button>
+
+                    {
+                        username == commented_by_user || username == blog_author ? 
+                        <button className="p-2 px-3 rounded-md border border-grey hover:bg-red/30 hover:text-red flex items-center gap-2"
+                            onClick={deleteComment}
+                        >
+                             <i className="fi fi-br-trash pointer-events-none"></i>
+                        </button>
+                        : ""
+                    }
                     </div>
 
                     {

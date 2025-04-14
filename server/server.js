@@ -679,6 +679,66 @@ server.post('/get-replies', (req, res) => {
         })
 })
 
+const deleteComments = async (_id) => {
+    try {
+        const comment = await Comment.findOneAndDelete({ _id });
+        if (!comment) return;
+
+        // Remove from parent
+        if (comment.parent) {
+            await Comment.findOneAndUpdate(
+                { _id: comment.parent },
+                { $pull: { children: _id } }
+            );
+        }
+
+        // Delete notifications
+        await Notification.findOneAndDelete({ comment: _id });
+        await Notification.findOneAndDelete({ reply: _id });
+
+        // Update blog: fix `$pull` typo and conditional `$inc`
+        await Blog.findOneAndUpdate(
+            { _id: comment.blog_id },
+            {
+                $pull: { comments: _id },
+                $inc: {
+                    "activity.total_comments": -1,
+                    ...(comment.parent ? {} : { "activity.total_parent_comments": -1 })
+                }
+            }
+        );
+
+        // Recursively delete children comments
+        if (comment.children?.length) {
+            for (const childId of comment.children) {
+                await deleteComments(childId);
+            }
+        }
+
+    } catch (err) {
+        console.error("Error deleting comment:", err.message);
+    }
+};
+
+
+server.post('/delete-comment', verifyJWT,(req,res) => {
+
+    let user_id = req.user;
+    let { _id } = req.body;
+    Comment.findOne({ _id})
+    .then(comment => {
+        if(user_id == comment.commented_by || user_id == comment.blog_author ){
+            deleteComments(_id)
+
+            return res.status(200).json({status: "Deleted"})
+
+        }
+        else{
+            return res.status(403).json({error: "You cannot delete this comment"})
+        }
+    })
+})
+
 // Start the server (with binding to 0.0.0.0 for mobile access)
 server.listen(PORT, '0.0.0.0', () => {
     console.log('Listening on port -> ' + PORT);
