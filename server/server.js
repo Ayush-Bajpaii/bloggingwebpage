@@ -652,21 +652,19 @@ server.post('/get-blog-comments', (req, res) => {
 
 server.post('/get-replies', (req, res) => {
     let { _id, skip } = req.body;
-    let maxLimit = 5;
+    let maxLimit = 3;
     Comment.findOne({ _id })
         .populate({
-            path: 'children',
-            option: {
+            path: "children",
+            options: {
                 limit: maxLimit,
                 skip: skip,
-                sort: {
-                    'commentedAt': -1
-                }
+                sort: { 'commentedAt': -1 }
 
             },
             populate: {
                 path: 'commented_by',
-                select : "personal_info.profile_img personal_info.username personal_info.fullname"
+                select : 'personal_info.profile_img personal_info.username personal_info.fullname'
             },
             select : "-blog_id -updatedAt "
         })
