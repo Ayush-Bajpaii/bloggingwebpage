@@ -9,12 +9,11 @@ const InputBox = ({ name, type, id, value, placeholder, icon, onChange }) => {
                 name={name}
                 type={type === "password" ? (passwordVisible ? "text" : "password") : type}
                 placeholder={placeholder}
-                value={value !== undefined ? value : ""} // Controlled input if value is provided
-                defaultValue={value === undefined ? "" : undefined} // Uncontrolled if value is not provided
-                onChange={onChange} // Handle changes if onChange is provided
+                {...(value !== undefined && onChange ? { value } : {})}
+                onChange={onChange}
                 id={id}
                 className="input-box"
-                autoComplete={type === "password" ? "new-password" : "off"} // Prevent autofill issues
+                autoComplete={type === "password" ? "new-password" : "off"}
             />
 
             <i className={`fi ${icon} input-icon`}></i>
