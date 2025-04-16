@@ -11,10 +11,9 @@ import InPageNavigation from "../components/inpage-navigation.component";
 import LoadMoreDataBtn from "../components/load-more.component";
 import NoDataMessage from "../components/nodata.component";
 import BlogPostCard from "../components/blog-post.component";
-import MinimalBlogPost from "../components/nobanner-blog-post.component";
 import PageNotFound from "./404.page";
 
-export const profileDataStructre = {
+export const profileDataStructure = {
     personal_info: {
         fullname: "",
         username: "",
@@ -34,7 +33,7 @@ export const profileDataStructre = {
 const ProfilePage = () => {
     let { id: profileId } = useParams();
 
-    let [profile, setProfile] = useState(profileDataStructre);
+    let [profile, setProfile] = useState(profileDataStructure);
     let [loading, setLoading] = useState(true);
     let [blogs, setBlogs] = useState(null);
     let [profileLoaded, setProfileLoaded] = useState("");
@@ -94,7 +93,7 @@ const ProfilePage = () => {
     }, [profileId,blogs])
 
     const resetStates = () => {
-        setProfile(profileDataStructre);
+        setProfile(profileDataStructure);
         setLoading(true);
         setProfileLoaded("");
     }

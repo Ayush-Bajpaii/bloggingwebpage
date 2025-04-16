@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-const InputBox = ({ name, type, id, value, placeholder, icon, onChange }) => {
+const InputBox = ({ name, type, id, value, placeholder, icon, onChange, disable = false }) => {
     const [passwordVisible, setPasswordVisible] = useState(false);
 
     return (
@@ -12,6 +12,7 @@ const InputBox = ({ name, type, id, value, placeholder, icon, onChange }) => {
                 {...(value !== undefined && onChange ? { value } : {})}
                 onChange={onChange}
                 id={id}
+                disabled={disable}
                 className="input-box"
                 autoComplete={type === "password" ? "new-password" : "off"}
             />

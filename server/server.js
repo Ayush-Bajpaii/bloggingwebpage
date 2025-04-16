@@ -321,42 +321,42 @@ server.post("/google-auth", async (req, res) => {
 });
 
 
-    server.post('/change-password', verifyJWT, (req,res) => {
-        let { currentPassword, newPassword } = req.body;
+server.post('/change-password', verifyJWT, (req, res) => {
+    let { currentPassword, newPassword } = req.body;
 
-        if(!passwordRegex.test(currentPassword) || !passwordRegex.test(newPassword)){
-            return res.status(403).json({ error: "Password should be 6 to 20 characters long with a numeric, 1 lowercase and 1 uppercase letter"})
-        }
+    if (!passwordRegex.test(currentPassword) || !passwordRegex.test(newPassword)) {
+        return res.status(403).json({ error: "Password should be 6 to 20 characters long with a numeric, 1 lowercase and 1 uppercase letter" })
+    }
 
-        User.findOne({ _id: req.user})
+    User.findOne({ _id: req.user })
         .then((user) => {
-            if(user.google_auth){
-                return res.status(403).json({error: "You cannot change account's password as you logged in through Google"})
+            if (user.google_auth) {
+                return res.status(403).json({ error: "You cannot change account's password as you logged in through Google" })
             }
-            bcrypt.compare(currentPassword,user.personal_info.password,(err,result)=> {
-                if(err){
-                    return res.status(403).json({error: "Some error occured while changing the password,please try again later"})
+            bcrypt.compare(currentPassword, user.personal_info.password, (err, result) => {
+                if (err) {
+                    return res.status(403).json({ error: "Some error occured while changing the password,please try again later" })
                 }
-                if(!result){
-                    return res.status(403).json({error:  "Incorrect Current Password "})
+                if (!result) {
+                    return res.status(403).json({ error: "Incorrect Current Password " })
                 }
 
-                bcrypt.hash(newPassword, 10,(err, hashed_password) => {
-                    User.findOneAndUpdate({ _id: req.user }, { "personal_info.password":  hashed_password})
-                    .then((u) =>{
-                        return res.status(200).json({status: "Password Changed"})
-                    })
-                    .catch(err => {
-                        return res.status(500).json({ error: "Some error occured while saving new password, please try again later " })
-                    })
+                bcrypt.hash(newPassword, 10, (err, hashed_password) => {
+                    User.findOneAndUpdate({ _id: req.user }, { "personal_info.password": hashed_password })
+                        .then((u) => {
+                            return res.status(200).json({ status: "Password Changed" })
+                        })
+                        .catch(err => {
+                            return res.status(500).json({ error: "Some error occured while saving new password, please try again later " })
+                        })
                 })
             })
         })
-        .catch(err=> {
+        .catch(err => {
             console.log(err);
-            res.status(500).json({ error:"User not found " })
+            res.status(500).json({ error: "User not found " })
         })
-    })
+})
 
 
 
@@ -496,6 +496,16 @@ server.post('/get-profile', (req, res) => {
             return res.status(500).json({ error: err.message })
         })
 })
+
+server.post("/updated-profile-img", verifyJWT, (req,res) => {
+    let { url } = req.body;
+    User.findOneAndUpdate({_id :req.user}, { "personal_info.profile_img": url })
+    .then(() =>{
+         return res.status(200).json({profile_img:url})
+    })
+    .catch(err => {error :err.message})
+})
+
 
 // Create Blog route (common in both files)
 server.post('/create-blog', verifyJWT, (req, res) => {
@@ -705,16 +715,16 @@ server.post('/get-replies', (req, res) => {
             },
             populate: {
                 path: 'commented_by',
-                select : 'personal_info.profile_img personal_info.username personal_info.fullname'
+                select: 'personal_info.profile_img personal_info.username personal_info.fullname'
             },
-            select : "-blog_id -updatedAt "
+            select: "-blog_id -updatedAt "
         })
         .select("children")
         .then(doc => {
-            return res.status(200).json({replies: doc.children })
+            return res.status(200).json({ replies: doc.children })
         })
         .catch(err => {
-            return res.status(500).json({error:err.message})
+            return res.status(500).json({ error: err.message })
         })
 })
 
@@ -760,22 +770,22 @@ const deleteComments = async (_id) => {
 };
 
 
-server.post('/delete-comment', verifyJWT,(req,res) => {
+server.post('/delete-comment', verifyJWT, (req, res) => {
 
     let user_id = req.user;
     let { _id } = req.body;
-    Comment.findOne({ _id})
-    .then(comment => {
-        if(user_id == comment.commented_by || user_id == comment.blog_author ){
-            deleteComments(_id)
+    Comment.findOne({ _id })
+        .then(comment => {
+            if (user_id == comment.commented_by || user_id == comment.blog_author) {
+                deleteComments(_id)
 
-            return res.status(200).json({status: "Deleted"})
+                return res.status(200).json({ status: "Deleted" })
 
-        }
-        else{
-            return res.status(403).json({error: "You cannot delete this comment"})
-        }
-    })
+            }
+            else {
+                return res.status(403).json({ error: "You cannot delete this comment" })
+            }
+        })
 })
 
 // Start the server (with binding to 0.0.0.0 for mobile access)

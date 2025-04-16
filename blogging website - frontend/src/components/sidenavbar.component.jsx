@@ -9,8 +9,8 @@ const SideNav = () => {
     let { userAuth: { access_token } } = useContext(UserContext);
 
     let page = location.pathname.split("/")[2];
-    let [pageState , setpageState] = useState(page.replace('-',' '));
-    let [ showSideNav, setShowSideNav ] = useState(false);
+    let [pageState, setpageState] = useState(page.replace('-', ' '));
+    let [showSideNav, setShowSideNav] = useState(false);
 
     let activeTabLine = useRef();
     let sideBarIconTab = useRef();
@@ -19,14 +19,14 @@ const SideNav = () => {
 
     const changePageState = (e) => {
         let { offsetWidth, offsetLeft } = e.target;
-        activeTabLine.current.style.width = offsetWidth  + "px";
-        activeTabLine.current.style.left = offsetLeft  + "px";
+        activeTabLine.current.style.width = offsetWidth + "px";
+        activeTabLine.current.style.left = offsetLeft + "px";
 
-        if(e.target == sideBarIconTab.current){
+        if (e.target == sideBarIconTab.current) {
             setShowSideNav(true);
 
         }
-        else{
+        else {
             setShowSideNav(false);
         }
 
@@ -34,33 +34,33 @@ const SideNav = () => {
     useEffect(() => {
         setShowSideNav(false);
         pageStateTab.current.click();
-    },[pageState])
+    }, [pageState])
 
     return (
 
         access_token == null ? <Navigate to="/signin" /> :
 
             <>
-                <section className="relative flex gap-10 py-0 m-0 max-md:flex-col">
+                <section className="relative flex gap-8 py-0 m-0 max-md:flex-col">
                     <div className="sticky top-[80px] z-30 ">
 
                         <div className="md:hidden bg-white py-1 border-b border-grey flex flex-nowrap overflow-x-auto ">
                             <button ref={sideBarIconTab} className="p-5 capitalize" onClick={changePageState}>
-                            <i className="fi fi-br-bars-staggered pointer-events-none"></i>
+                                <i className="fi fi-br-bars-staggered pointer-events-none"></i>
                             </button>
-                            <button ref={pageStateTab} className="p-5 capitalize"onClick={changePageState} >
+                            <button ref={pageStateTab} className="p-5 capitalize" onClick={changePageState} >
                                 {pageState}
                             </button>
-                            <hr ref={activeTabLine} className="absolute bottom-0 duration-500"/>
+                            <hr ref={activeTabLine} className="absolute bottom-0 duration-500" />
                         </div>
                         <div
                             className={
-                                "min-w-[200px] h-[calc(100vh-80px-60px)] md:h-cover md:sticky top-24 overflow-y-auto p-6 mr:pr-0 md:border-grey md:border-r absolute max:-md:top-[64px] bg-white max-md:w-[calc(100%+80px)] max-md:px-16 max-md:-ml-7 duration-500" +
+                                "min-w-[200px] h-[calc(100vh-80px-60px)]  md:sticky top-24 overflow-y-auto p-6 md:pr-0 md:border-grey md:border-r absolute max-md:top-[64px] bg-white max-md:w-[calc(100%+80px)] max-md:px-16 max-md:-ml-7 duration-500 " +
                                 (!showSideNav
-                                    ? " max-md:opacity-0 max-md:pointer-events-none"
-                                    : " opacity-100 pointer-events-auto")
+                                    ? "max-md:opacity-0 max-md:pointer-events-none"
+                                    : "opacity-100 pointer-events-auto")
                             }>
-                            <h1 className="text-xl text-dark-grey mb-3">Dashboard</h1>
+                            <h1 className="text-xl text-dark-grey mb-3">Dashboard</h1> 
                             <hr className="border-grey -ml-6 mb-8 mr-6" />
                             <NavLink to="/dashboard/blogs" onClick={(e) => setpageState(e.target.innerText)} className="sidebar-link">
                                 <i className="fi fi-sr-document"></i>
@@ -79,13 +79,13 @@ const SideNav = () => {
                             <h1 className="text-xl text-dark-grey mt-20 mb-3">Settings</h1>
                             <hr className="border-grey -ml-6 mb-8 mr-6" />
                             <NavLink to="/settings/edit-profile" onClick={(e) => setpageState(e.target.innerText)} className="sidebar-link">
-                            <i className="fi fi-sr-user"></i>
+                                <i className="fi fi-sr-user"></i>
                                 Edit Profile
                             </NavLink>
 
                             <NavLink to="/settings/change-password"
-                            onClick={(e) => setpageState(e.target.innerText)} className="sidebar-link">
-                            <i className="fi fi-sr-lock"></i>
+                                onClick={(e) => setpageState(e.target.innerText)} className="sidebar-link">
+                                <i className="fi fi-sr-lock"></i>
                                 Change Password
                             </NavLink>
 
@@ -93,13 +93,13 @@ const SideNav = () => {
 
                     </div>
 
-                    <div>
-                <Outlet className="max-md:-t-8 mt-5 w-full"/>
-                </div>
+                    <div className="w-full min-h-screen pt-[30px]">
+                        <Outlet className="max-md:mt-5 mt-5 w-full" />
+                    </div>
 
                 </section>
 
-             
+
             </>
 
     )
