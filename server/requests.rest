@@ -1,0 +1,16 @@
+POST http://192.168.43.38:3000/update-profile
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3ZTRhZjk1MzgwYzc5MWM1YmNmYTY1ZSIsImlhdCI6MTc0NDgxMjk2NH0.JZAo8aHzkECqSkpO0G9-XqIzPrFBa2SLbxuqjEAVxHQ
+
+{
+    "username": "yash123",
+    "bio": "This is a test bio.",
+    "social_links": {
+        "youtube": "",
+        "facebook": "",
+        "twitter": "",
+        "instagram": "",
+        "github": "",
+        "website": ""
+    }
+}

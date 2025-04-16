@@ -111,7 +111,37 @@ const EditProfile = () => {
         }
         if(bio.length > bioLimit){
             return toast.error(`Bio should not be more than ${bioLimit}`)
-        }
+        } 
+
+        let loadingToast = toast.loading("Updating...")
+        e.target.setAttribute("disabled",true)
+        
+
+
+
+        axios.post(import.meta.env.VITE_SERVER_DOMAIN + "/update-profile", {
+            username,bio, social_links:{ youtube, facebook,twitter,instagram,github,website }
+        },{
+            headers:{
+                'Authorization': `Bearer ${access_token}`
+            }
+        })
+        .then(({data}) => {
+            if(userAuth.username != data.username){
+                let newUserAuth = { ...userAuth,username: data.username };
+                storeInSession("user",JSON.stringify(newUserAuth));
+                setUserAuth(newUserAuth);
+            }
+            toast.dismiss(loadingToast);
+            e.target.removeAttribute("disabled");
+            toast.success("Profile Updated ✅")
+        })
+        .catch(({ response }) => {
+            toast.dismiss(loadingToast);
+            e.target.removeAttribute("disabled");
+            toast.error(response.data.error);
+            console.log("Access token:", access_token);
+        })
     }
 
     return (
@@ -121,7 +151,6 @@ const EditProfile = () => {
                 loading ? <Loader /> :
                     <form ref={editProfileForm} >
                         <Toaster />
-                        <h1 className="max-md:hidden">Added Profile</h1>
                         <div className="flex flex-col lg:flex-row items-start py-10 gap-8 lg:gap-10">
                             <div className="max-lg:center mb-5">
                                 <label htmlFor="uploadImg" id="profileImgLabel"

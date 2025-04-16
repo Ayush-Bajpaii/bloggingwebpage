@@ -507,6 +507,54 @@ server.post("/updated-profile-img", verifyJWT, (req,res) => {
 })
 
 
+server.post('/update-profile', verifyJWT ,(req,res) => {
+    let { username,bio, social_links } = req.body;
+    let bioLimit = 150;
+
+    if(username.length < 3){
+        return res.status(403).json({ error: "Username should be atleast 3 letters long " })
+    }
+    if(bio.length > bioLimit ){
+        return res.status(403).json({ error: `Bio should not be more than ${bioLimit} characters` })
+    }
+
+    let socialLinksArr  = Object.keys(social_links);
+    try{
+        for(let i = 0;i < socialLinksArr.length;i++){
+            if(social_links[socialLinksArr[i]].length){
+                let hostname = new URL(social_links[socialLinksArr[i]]).hostname; 
+                if(!hostname.includes(`${socialLinksArr[i]}.com`) && socialLinksArr[i] != 'website'){
+                    return res.status(403).json({error:`This ${socialLinksArr[i]} link is invalid you must enter full links `})
+                }
+            }
+        }
+
+    }catch(err){
+        return res.status(500).json({error: "You must provide full social links with http(s) included"})
+    }
+    let updateObj = {
+        "personal_info.username": username,
+        "personal_info.bio": bio,
+        social_links
+
+    }
+    User.findOneAndUpdate({ _id:req.user }, updateObj,{
+        runValidators:true
+
+    })
+    .then(() => {
+        return res.status(200).json({ username })
+    })
+    .catch(err => {
+        if(err.code == 1100){
+            return res.status(409).json({ error: "Username is already taken" })
+        }
+        return res.status(500).json({ error: err.message })
+    })
+
+})
+
+
 // Create Blog route (common in both files)
 server.post('/create-blog', verifyJWT, (req, res) => {
     let authorId = req.user;
