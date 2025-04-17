@@ -1,0 +1,54 @@
+import { Link } from "react-router-dom";
+import { getDay } from "../common/date";
+
+const NotificationCard = ( { data,index,notificationState, }) => {
+
+    let { type,createdAt ,comment, replied_on_comment,user: { personal_info: {fullname,username, profile_img } },blog:{ blog_id,title } } = data;
+    return (
+        <div className="p-6 border-b border-grey border-1-black">
+            <div className="flex gap-5 mb-3 ">
+                <img src={profile_img} className="w-14 h-14 flex-none rounded-full "/>
+                <div className="w-full ">
+                    <h1 className="font-medium text-xl text-dark-grey">
+                        <span className="lg:inline-block hidden capitalize">{fullname}</span>
+                        <Link to={`/user/${username}`} className="mx-1 text-block underline">@{username}</Link>
+                        <span className="font-normal">
+                            {
+                                type == 'like' ? "liked your Blog" :
+                                type == 'comment' ? "commented on" : "replied on"
+                            }
+                        </span>
+                    </h1>
+                    {
+                        type == 'reply' ? 
+                        <div className="p-4 mt-4 rounded-md bg-grey">
+                            <p>{replied_on_comment.comment}</p>
+                        </div>
+                        :
+                        <Link to={`/blog/${blog_id}`} className="font-medium text-dark-grey  line-clamp-1 hover:underline">
+                            {`"${title}"`}
+                        </Link>
+                    }
+
+                </div>
+            </div>
+            {
+                type != 'like' ? 
+                <p className="ml-14 pl-5 font-gelasio text-xl my-5">{comment.comment}</p> : ""
+            }
+
+            <div className="ml-14 pl-4 text-dark-grey mt-3 flex gap-8">
+                <p>{getDay(createdAt)}</p>
+                {
+                    type != 'like' ?
+                    <>
+                    <button className="underline hover:text-black">Reply</button>
+                    <button className="underline hover:text-black">Delete</button>
+                    </> : ""
+                }
+                 
+            </div>
+        </div>
+    )
+}
+export default NotificationCard;
