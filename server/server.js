@@ -686,7 +686,7 @@ server.post('/isliked-by-user', verifyJWT, (req, res) => {
 
 server.post('/add-comment', verifyJWT, (req, res) => {
     let user_id = req.user;
-    let { _id, comment, replying_to, blog_author } = req.body;
+    let { _id, comment, replying_to, blog_author,notification_id  } = req.body;
 
     if (!comment.length) {
         return res.status(403).json({ error: "Write something to leave a comment...." })
@@ -721,6 +721,10 @@ server.post('/add-comment', verifyJWT, (req, res) => {
             notificationObj.replied_on_comment = replying_to;
             await Comment.findOneAndUpdate({ _id: replying_to }, { $push: { children: commentFile._id } })
                 .then(replyingToCommentDoc => { notificationObj.notification_for = replyingToCommentDoc.commented_by })
+                if(notification_id){
+                    Notification.findOneAndUpdate({ _id: notification_id },{ reply:commentFile._id })
+                    .then(notification => console.log('notification updated'))
+                }
         }
 
         new Notification(notificationObj).save().then(notification => console.log('new comment notification created'));
@@ -791,7 +795,7 @@ const deleteComments = async (_id) => {
 
         // Delete notifications
         await Notification.findOneAndDelete({ comment: _id });
-        await Notification.findOneAndDelete({ reply: _id });
+        await Notification.findOneAndUpdate({ reply: _id },{$unset: { reply:1  }});
 
         // Update blog: fix `$pull` typo and conditional `$inc`
         await Blog.findOneAndUpdate(
@@ -878,6 +882,10 @@ server.post("/notifications", verifyJWT, (req,res) =>{
     .sort({ createdAt:-1 })
     .select("createdAt type seen reply")
     .then(notifications => {
+        Notification.updateMany(findQuery, { seen:true })
+        .skip(skipDocs)
+        .limit(maxLimit)
+        .then(() => console.log('seen Nf'))
         return res.status(200).json({ notifications })
     })
     .catch(err => {
