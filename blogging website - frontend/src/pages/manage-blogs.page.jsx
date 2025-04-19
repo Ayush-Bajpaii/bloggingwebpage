@@ -10,6 +10,7 @@ import NoDataMessage from "../components/nodata.component";
 import AnimationWrapper from "../common/page-animation";
 import {ManagePublishedBlogCard , ManageDraftBlogPost } from "../components/manage-blogcard.component";
 import LoadMoreDataBtn from "../components/load-more.component";
+import { useSearchParams } from "react-router-dom";
 
 
 const ManageBlogs = () => {
@@ -18,6 +19,8 @@ const ManageBlogs = () => {
     const [blogs, setBlogs] = useState(null);
     const [drafts, setDrafts] = useState(null);
     const [query, setQuery] = useState("");
+
+    let activeTab = useSearchParams()[0].get("tab")
 
     const getBlogs = ({ page, draft, deletedDocCount = 0 }) => {
         axios.post(import.meta.env.VITE_SERVER_DOMAIN + "/user-written-blogs", {
@@ -98,7 +101,7 @@ const ManageBlogs = () => {
 
             </div>
 
-            <InPageNavigation routes={["Published Blogs", "Drafts"]}>
+            <InPageNavigation routes={["Published Blogs", "Drafts"]} defaultActiveIndex={ activeTab != 'draft' ? 0 : 1 }>
                 {//published blogs
 
                     blogs == null ? <Loader /> :
