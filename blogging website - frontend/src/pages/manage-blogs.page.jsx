@@ -19,9 +19,9 @@ const ManageBlogs = () => {
     const [drafts, setDrafts] = useState(null);
     const [query, setQuery] = useState("");
 
-    const getBlogs = ({ page, draft, deleteDocCount = 0 }) => {
+    const getBlogs = ({ page, draft, deletedDocCount = 0 }) => {
         axios.post(import.meta.env.VITE_SERVER_DOMAIN + "/user-written-blogs", {
-            page, draft, query, deleteDocCount
+            page, draft, query, deletedDocCount
         }, {
             headers: {
                 'Authorization': `Bearer ${access_token}`
@@ -112,7 +112,7 @@ const ManageBlogs = () => {
                                         </AnimationWrapper>
                                     })
                                 }
-                                <LoadMoreDataBtn/>
+                                
                             </>
                             : <NoDataMessage message="No Published Blogs" />
                 }
@@ -130,6 +130,8 @@ const ManageBlogs = () => {
                                         </AnimationWrapper>
                                     })
                                 }
+                                 <LoadMoreDataBtn state={drafts} fetchDataFun={getBlogs} additionalParam={{draft:true, deletedDocCount:drafts.deletedDocCount}}/>
+
                             </>
                             : <NoDataMessage message="No draft Blogs" />
                 }
