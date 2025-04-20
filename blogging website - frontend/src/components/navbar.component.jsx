@@ -2,13 +2,16 @@
 import { useContext, useEffect, useState } from "react";
 import { Link, Outlet, useNavigate } from "react-router-dom";
 import logo from "../imgs/logo.png";
-import { UserContext } from "../App";
+import { ThemeContext, UserContext } from "../App";
 import UserNavigationPanel from "./user-navigation.component";
 import axios from "axios";
+import { storeInSession } from "../common/session";
 
 const Navbar = () => {
   const [searchBoxVisibility, setSearchBoxVisibility] = useState(false);
   const [userNavPanel, setUserNavPanel] = useState(false);
+
+  let {  theme,setTheme } = useContext(ThemeContext)
 
   let navigate = useNavigate();
 
@@ -51,32 +54,35 @@ const Navbar = () => {
     }, 200);
   };
 
-  console.log(new_notification_available)
+  const changeTheme = () => {
+     let newTheme = theme == "light" ? "dark" : "light";
+
+     setTheme(newTheme);
+     document.body.setAttribute("data-theme" ,newTheme)
+     storeInSession("theme",newTheme)
+  }
 
   return (
     <>
       <nav className="navbar z-50">
-        <Link to="/" className="flex-none w-12">
+        <Link to="/" className="flex-none w-10">
           <img src={logo} alt="Logo" />
         </Link>
 
-        <p>{ new_notification_available }</p>
-
         <div
           className={
-            "absolute bg-white w-full left-0 top-full mt-1 border-gray-200 py-4 px-[5vw] md:border-0 md:block md:relative md:inset-0 md:p-0 md:w-auto rounded-2xl md:show " +
+            "absolute bg-white w-full left-0 top-full mt-0.5 border-grey border-b py-4 px-[5vw] md:border-0 md:block md:relative md:inset-0 md:p-0 md:w-auto rounded-2xl md:show " +
             (searchBoxVisibility ? "show" : "hide")
           }
         >
-          <div className="relative">
             <input
               type="text"
               placeholder="Search"
-              className="w-full md:w-auto bg-gray-100 p-4 pl-6 pr-12 rounded-full placeholder:text-gray-600 md:pl-12 focus:outline-none focus:ring-4 focus:ring-blue-400/50 transition-all duration-300 shadow-md hover:bg-gray-200"
+              className="w-full md:w-auto bg-gray-100 p-4 pl-6 pr-[12%] rounded-full placeholder:text-dark-grey md:pl-12"
               onKeyDown={handleSearch}
             />
             <i className="fi fi-rr-search absolute right-6 md:pointer-events-none top-1/2 -translate-y-1/2 text-2xl text-gray-500 transition-all duration-300 hover:text-gray-700"></i>
-          </div>
+         
         </div>
 
         <div className="flex items-center gap-3 md:gap-6 ml-auto">
@@ -91,8 +97,14 @@ const Navbar = () => {
             <p>Write</p>
           </Link>
 
+          <button className="w-12 h-12 rounded-full bg-grey relative hover:bg-black/10"
+          onClick={changeTheme}
+          >
+          <i className="fi fi-rr-moon-stars"></i>
+          </button>
+
           {access_token ? (
-            <>
+            <> 
               <Link to="/dashboard/notifications">
                 <button className="w-12 h-12 rounded-full bg-grey relative hover:bg-black/10">
                   <i className="fi fi-ss-bell-ring text-2xl block mt-1"></i>

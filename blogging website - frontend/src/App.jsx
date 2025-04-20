@@ -17,16 +17,32 @@ import ManageBlogs from "./pages/manage-blogs.page";
 
 export const UserContext = createContext({});
 
+export const ThemeContext = createContext({})
+
 const App = () => {
     const [userAuth, setUserAuth] = useState({ access_token: null });
-    const [isLoading, setIsLoading] = useState(true); // Add loading state
+    const [isLoading, setIsLoading] = useState(true); 
+    
+    const [theme, setTheme] = useState("light");
 
     useEffect(() => {
         let userInSession = lookInSession("user");
+        let themeInSession = lookInSession("theme");
         if (userInSession) {
             setUserAuth(JSON.parse(userInSession));
         }
+        if(themeInSession){
+            setTheme(() => {
+                document.body.setAttribute('data-theme',themeInSession)
+                return themeInSession;
+
+            })
+        }else{
+            document.body.setAttribute('data-theme',theme)
+        }
         setIsLoading(false); // Session check complete
+
+        
     }, []);
 
     if (isLoading) {
@@ -34,6 +50,7 @@ const App = () => {
     }
 
     return (
+        <ThemeContext.Provider value={{theme,setTheme}}>
         <UserContext.Provider value={{ userAuth, setUserAuth }}>
             <Routes>
                 <Route path="/editor" element={<Editor />} />
@@ -69,6 +86,7 @@ const App = () => {
                 </Route>
             </Routes>
         </UserContext.Provider>
+        </ThemeContext.Provider>
     );
 };
 
