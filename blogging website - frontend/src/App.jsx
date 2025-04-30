@@ -14,19 +14,22 @@ import ChangePassword from "./pages/change-password.page";
 import EditProfile from "./pages/edit-profile.page";
 import Notifications from "./pages/notifications.page";
 import ManageBlogs from "./pages/manage-blogs.page";
+import ForgotPassword from "./pages/ForgotPassword.page";
+import VerifyOTP from "./pages/VerifyOTP.page";
+import ResetPassword from "./pages/ResetPassword.page";
 
 export const UserContext = createContext({});
 
 const App = () => {
     const [userAuth, setUserAuth] = useState({ access_token: null });
-    const [isLoading, setIsLoading] = useState(true); // Add loading state
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         let userInSession = lookInSession("user");
         if (userInSession) {
             setUserAuth(JSON.parse(userInSession));
         }
-        setIsLoading(false); // Session check complete
+        setIsLoading(false);
     }, []);
 
     if (isLoading) {
@@ -41,27 +44,18 @@ const App = () => {
                 <Route path="/" element={<Navbar />}>
                     <Route index element={<HomePage />} />
                     <Route path="dashboard" element={<SideNav />}>
-                        <Route
-                            path="blogs"
-                            element={<ManageBlogs/>}
-                        />
-                        <Route
-                            path="notifications"
-                            element={<Notifications />}
-                        />
+                        <Route path="blogs" element={<ManageBlogs />} />
+                        <Route path="notifications" element={<Notifications />} />
                     </Route>
                     <Route path="settings" element={<SideNav />}>
-                        <Route
-                            path="edit-profile"
-                            element={<EditProfile />}
-                        />
-                        <Route
-                            path="change-password"
-                            element={<ChangePassword />}
-                        />
+                        <Route path="edit-profile" element={<EditProfile />} />
+                        <Route path="change-password" element={<ChangePassword />} />
                     </Route>
                     <Route path="/signin" element={<UserAuthForm type="sign-in" />} />
                     <Route path="/signup" element={<UserAuthForm type="sign-up" />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/verify-otp" element={<VerifyOTP />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="search/:query" element={<SearchPage />} />
                     <Route path="user/:id" element={<ProfilePage />} />
                     <Route path="blog/:blog_id" element={<BlogPage />} />

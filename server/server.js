@@ -16,6 +16,7 @@ import dns from "dns";
 import { promisify } from "util";
 import Notification from "./Schema/Notification.js";
 import Comment from "./Schema/Comment.js";
+import crypto from 'crypto';
 
 const require = createRequire(import.meta.url);
 const serviceAccountKey = require("./blogwebsite-79574-firebase-adminsdk-fbsvc-f114d3e651.json");
@@ -56,21 +57,42 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// Generate and send OTP - from second file
-const sendOTP = async (email) => {
+// Replace existing sendOTP function in server.js
+const sendOTP = async (email, type) => {
     const otp = otpGenerator.generate(6, { upperCaseAlphabets: false, specialChars: false });
-    otpStorage.set(email, { otp, expires: Date.now() + 10 * 60 * 1000 }); // OTP expires in 10 minutes
-
+    const normalizedEmail = email.toLowerCase(); // Normalize email to lowercase
+    otpStorage.set(normalizedEmail, { otp, expires: Date.now() + 10 * 60 * 1000 }); // 10 minutes expiry
+    console.log(`OTP Generated for ${normalizedEmail} (${type}): ${otp}`);
+    console.log(`otpStorage after set:`, otpStorage.get(normalizedEmail));
+  
+    let subject, text;
+    switch (type) {
+      case 'signup':
+      case 'signin':
+        subject = 'Email Verification OTP';
+        text = `Your OTP for email verification is: ${otp}. It expires in 10 minutes.`;
+        break;
+      case 'forgot-password':
+        subject = 'Password Reset OTP';
+        text = `Your OTP for password reset is: ${otp}. It expires in 10 minutes.`;
+        break;
+      default:
+        throw new Error('Invalid OTP type');
+    }
+  
     const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: "Email Verification OTP",
-        text: `Your OTP for email verification is: ${otp}. It expires in 10 minutes.`
+      from: process.env.EMAIL_USER,
+      to: email, // Use original email for sending
+      subject,
+      text,
     };
-
+  
     await transporter.sendMail(mailOptions);
+    console.log(`OTP Email sent to ${email}`);
     return otp;
-};
+  };
+
+
 
 // Verify OTP - from second file
 const verifyOTP = (email, otp) => {
@@ -160,57 +182,215 @@ server.get('/get-upload-url', (req, res) => {
         });
 });
 
-// Request OTP route - from second file
-server.post("/request-otp", async (req, res) => {
+// Replace existing /request-otp route in server.js
+server.post('/request-otp', async (req, res) => {
     const { email, type } = req.body;
     if (!email || !emailRegex.test(email)) {
-        return res.status(403).json({ error: "Invalid Email" });
+      console.log('Invalid email format:', email);
+      return res.status(403).json({ error: 'Invalid Email' });
     }
-
-    // Verify email domain existence
+  
+    const normalizedEmail = email.toLowerCase(); // Normalize email
+    console.log(`Request OTP for: ${normalizedEmail}, Type: ${type}`);
+  
     const isDomainValid = await verifyEmailDomain(email);
     if (!isDomainValid) {
-        return res.status(403).json({ error: "Invalid Email" });
+      console.log(`Invalid email domain for ${normalizedEmail}`);
+      return res.status(403).json({ error: 'Invalid Email' });
     }
-
+  
     try {
-        const user = await User.findOne({ "personal_info.email": email });
-
-        if (type === "sign-in") {
-            if (!user) {
-                return res.status(403).json({ error: "Email not found. Please sign up first." });
-            }
-            if (user.google_auth) {
-                return res.status(403).json({ error: "This email is registered with Google. Please use Google to sign in." });
-            }
-        } else if (type === "sign-up") {
-            if (user) {
-                return res.status(403).json({ error: "Email already exists. Please sign in instead." });
-            }
-        } else {
-            return res.status(400).json({ error: "Invalid request type" });
+      const user = await User.findOne({ 'personal_info.email': normalizedEmail });
+      if (type === 'signin') {
+        if (!user) {
+          console.log(`User not found for ${normalizedEmail}`);
+          return res.status(403).json({ error: 'Email not found. Please sign up first.' });
         }
-
-        await sendOTP(email);
-        return res.status(200).json({ message: "OTP sent to your email" });
+        if (user.google_auth) {
+          console.log(`Google auth user: ${normalizedEmail}`);
+          return res.status(403).json({ error: 'This email is registered with Google. Please use Google to sign in.' });
+        }
+      } else if (type === 'signup') {
+        if (user) {
+          console.log(`User already exists for ${normalizedEmail}`);
+          return res.status(403).json({ error: 'Email already exists. Please sign in instead.' });
+        }
+      } else {
+        console.log('Invalid request type:', type);
+        return res.status(400).json({ error: 'Invalid request type' });
+      }
+  
+      await sendOTP(email, type);
+      return res.status(200).json({ message: 'OTP sent to your email' });
     } catch (err) {
-        console.error("Error sending OTP:", err);
-        return res.status(500).json({ error: "Failed to send OTP" });
+      console.error('Error sending OTP:', err);
+      return res.status(500).json({ error: 'Failed to send OTP' });
     }
-});
+  });
 
-// Verify OTP route - from second file
-server.post("/verify-otp", (req, res) => {
+// Replace existing /verify-otp route in server.js
+server.post('/verify-otp', (req, res) => {
     const { email, otp } = req.body;
     if (!email || !otp) {
-        return res.status(403).json({ error: "Email and OTP required" });
+      console.log('Missing email or OTP:', { email, otp });
+      return res.status(403).json({ error: 'Email and OTP are required' });
     }
-    const result = verifyOTP(email, otp);
-    if (!result.valid) {
-        return res.status(403).json({ error: result.error });
+  
+    const normalizedEmail = email.toLowerCase(); // Normalize email
+    console.log(`Verifying OTP for: ${normalizedEmail}, OTP: ${otp}`);
+    console.log(`otpStorage contents:`, otpStorage.get(normalizedEmail));
+  
+    const stored = otpStorage.get(normalizedEmail);
+    if (!stored) {
+      console.log(`No OTP found in otpStorage for ${normalizedEmail}`);
+      return res.status(403).json({ error: 'OTP not found. Request a new OTP.' });
     }
-    return res.status(200).json({ message: "OTP verified successfully" });
-});
+    if (stored.expires < Date.now()) {
+      otpStorage.delete(normalizedEmail);
+      console.log(`OTP expired for ${normalizedEmail}`);
+      return res.status(403).json({ error: 'OTP has expired. Request a new OTP.' });
+    }
+    if (stored.otp !== otp) {
+      console.log(`Invalid OTP for ${normalizedEmail}. Expected: ${stored.otp}, Received: ${otp}`);
+      return res.status(403).json({ error: 'Invalid OTP. Please try again.' });
+    }
+  
+    otpStorage.delete(normalizedEmail);
+    console.log(`OTP verified successfully for ${normalizedEmail}`);
+    return res.status(200).json({ message: 'OTP verified successfully' });
+  });
+
+
+// Replace existing /forgot-password route
+// Replace existing /forgot-password route in server.js
+server.post('/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    if (!email || !emailRegex.test(email)) {
+      console.log('Invalid email format:', email);
+      return res.status(403).json({ error: 'Invalid email' });
+    }
+  
+    const normalizedEmail = email.toLowerCase(); // Normalize email
+    console.log(`Forgot Password Request for: ${normalizedEmail}`);
+  
+    try {
+      const user = await User.findOne({ 'personal_info.email': normalizedEmail });
+      if (!user) {
+        console.log(`User not found for ${normalizedEmail}`);
+        return res.status(404).json({ error: 'No account found with this email' });
+      }
+      if (user.google_auth) {
+        console.log(`Google auth user: ${normalizedEmail}`);
+        return res.status(403).json({ error: 'This account uses Google authentication. Password reset is not available.' });
+      }
+  
+      const isDomainValid = await verifyEmailDomain(email);
+      if (!isDomainValid) {
+        console.log(`Invalid email domain for ${normalizedEmail}`);
+        return res.status(403).json({ error: 'Invalid email domain' });
+      }
+  
+      await sendOTP(email, 'forgot-password');
+      return res.status(200).json({ message: 'OTP sent to your email' });
+    } catch (err) {
+      console.error('Error in forgot password:', err);
+      return res.status(500).json({ error: 'Failed to send OTP. Please try again later.' });
+    }
+  });
+
+
+ // Add after other routes
+// Replace or add /resend-otp route in server.js
+server.post('/resend-otp', async (req, res) => {
+    const { email, type } = req.body;
+    if (!email || !emailRegex.test(email)) {
+      console.log('Invalid email format:', email);
+      return res.status(403).json({ error: 'Invalid email' });
+    }
+    if (!['signup', 'signin', 'forgot-password'].includes(type)) {
+      console.log('Invalid request type:', type);
+      return res.status(400).json({ error: 'Invalid request type' });
+    }
+  
+    const normalizedEmail = email.toLowerCase(); // Normalize email
+    console.log(`Resend OTP Request for: ${normalizedEmail}, Type: ${type}`);
+  
+    try {
+      const user = await User.findOne({ 'personal_info.email': normalizedEmail });
+      if (type === 'signin' || type === 'forgot-password') {
+        if (!user) {
+          console.log(`User not found for ${normalizedEmail}`);
+          return res.status(404).json({ error: 'No account found with this email' });
+        }
+        if (user.google_auth) {
+          console.log(`Google auth user: ${normalizedEmail}`);
+          return res.status(403).json({ error: 'This account uses Google authentication.' });
+        }
+      } else if (type === 'signup') {
+        if (user) {
+          console.log(`User already exists for ${normalizedEmail}`);
+          return res.status(403).json({ error: 'Email already exists. Please sign in instead.' });
+        }
+      }
+  
+      const isDomainValid = await verifyEmailDomain(email);
+      if (!isDomainValid) {
+        console.log(`Invalid email domain for ${normalizedEmail}`);
+        return res.status(403).json({ error: 'Invalid email domain' });
+      }
+  
+      await sendOTP(email, type);
+      return res.status(200).json({ message: 'OTP resent to your email' });
+    } catch (err) {
+      console.error('Error resending OTP:', err);
+      return res.status(500).json({ error: 'Failed to resend OTP. Please try again later.' });
+    }
+  });
+
+  // Replace existing /reset-password route in server.js
+server.post('/reset-password', async (req, res) => {
+    const { email, newPassword, confirmPassword } = req.body;
+    if (!email || !newPassword || !confirmPassword) {
+      console.log('Missing required fields:', { email, newPassword, confirmPassword });
+      return res.status(403).json({ error: 'Email, new password, and confirm password are required' });
+    }
+    if (!emailRegex.test(email)) {
+      console.log('Invalid email format:', email);
+      return res.status(403).json({ error: 'Invalid email' });
+    }
+    if (newPassword !== confirmPassword) {
+      console.log('Passwords do not match');
+      return res.status(403).json({ error: 'Passwords do not match' });
+    }
+    if (!passwordRegex.test(newPassword)) {
+      console.log('Invalid password format');
+      return res.status(403).json({ error: 'Password should be 6 to 20 characters long with a numeric, 1 lowercase, and 1 uppercase letter' });
+    }
+  
+    try {
+      const normalizedEmail = email.toLowerCase(); // Normalize email
+      console.log(`Reset Password for: ${normalizedEmail}`);
+      const user = await User.findOne({ 'personal_info.email': normalizedEmail });
+      if (!user) {
+        console.log(`User not found for ${normalizedEmail}`);
+        return res.status(404).json({ error: 'No account found with this email' });
+      }
+      if (user.google_auth) {
+        console.log(`Google auth user: ${normalizedEmail}`);
+        return res.status(403).json({ error: 'This account uses Google authentication. Password reset is not available.' });
+      }
+  
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      user.personal_info.password = hashedPassword;
+      await user.save();
+      console.log(`Password reset successfully for ${normalizedEmail}`);
+  
+      return res.status(200).json({ message: 'Password reset successfully' });
+    } catch (err) {
+      console.error('Error in reset password:', err);
+      return res.status(500).json({ error: 'Failed to reset password. Please try again later.' });
+    }
+  });
 
 // Signup route - from second file (with OTP)
 server.post("/signup", async (req, res) => {
@@ -497,14 +677,16 @@ server.post('/get-profile', (req, res) => {
         })
 })
 
-server.post("/updated-profile-img", verifyJWT, (req,res) => {
+server.post('/updated-profile-img', verifyJWT, (req, res) => {
     let { url } = req.body;
-    User.findOneAndUpdate({_id :req.user}, { "personal_info.profile_img": url })
-    .then(() =>{
-         return res.status(200).json({profile_img:url})
-    })
-    .catch(err => {error :err.message})
-})
+    User.findOneAndUpdate({ _id: req.user }, { 'personal_info.profile_img': url })
+      .then(() => {
+        return res.status(200).json({ profile_img: url });
+      })
+      .catch(err => {
+        return res.status(500).json({ error: err.message });
+      });
+  });
 
 
 server.post('/update-profile', verifyJWT ,(req,res) => {

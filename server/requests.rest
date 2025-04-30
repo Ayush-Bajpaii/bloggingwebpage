@@ -1,0 +1,16 @@
+# POST http://localhost:3000/forgot-password
+# Content-Type: application/json
+
+# {
+#     "email":"csm23043@tezu.ac.in"
+
+# }
+
+# POST http://localhost:3000/verify-otp
+# Content-Type: application/json
+
+# {
+#     "email":"csm23043@tezu.ac.in",
+#     "otp":"ps44w5"
+#     }
+curl -X POST http://localhost:3000/reset-password -H "Content-Type: application/json" -d '{"email":"csm23043@tezu.ac.in","newPassword":"NewPass123","confirmPassword":"NewPass123"}'
