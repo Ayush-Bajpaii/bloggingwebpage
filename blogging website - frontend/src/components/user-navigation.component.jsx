@@ -15,7 +15,7 @@ const UserNavigationPanel = () => {
       await signOut(auth); // Sign out from Firebase
       removeFromSession("user"); // Clear session storage
       setUserAuth({ access_token: null }); // Reset React context
-      console.log("User signed out successfully");
+      
     } catch (err) {
       console.error("Sign-out error:", err);
     }

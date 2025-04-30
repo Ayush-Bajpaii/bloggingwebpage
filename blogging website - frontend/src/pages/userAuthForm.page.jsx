@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect } from "react"; // Added useEffect
+import { useContext, useState, useEffect } from "react";
 import AnimationWrapper from "../common/page-animation";
 import InputBox from "../components/input.component";
 import googleIcon from "../imgs/google.png";
@@ -20,7 +20,6 @@ const UserAuthForm = ({ type }) => {
         confirmPassword: ""
     });
 
-    // Reset form data when the type (sign-in or sign-up) changes
     useEffect(() => {
         setFormData({
             fullname: "",
@@ -28,16 +27,17 @@ const UserAuthForm = ({ type }) => {
             password: "",
             confirmPassword: ""
         });
-        setOtpSent(false); // Also reset OTP state
-        setOtp(""); // Reset OTP input
-    }, [type]); // Run this effect whenever the type prop changes
+        setOtpSent(false);
+        setOtp("");
+    }, [type]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
     const userAuthThroughServer = (serverRoute, formData) => {
-        axios.post(import.meta.env.VITE_SERVER_DOMAIN + serverRoute, formData)
+        axios
+            .post(import.meta.env.VITE_SERVER_DOMAIN + serverRoute, formData)
             .then(({ data }) => {
                 storeInSession("user", JSON.stringify(data));
                 setUserAuth(data);
@@ -56,7 +56,6 @@ const UserAuthForm = ({ type }) => {
 
         const { fullname, email, password, confirmPassword } = formData;
 
-        // Validate inputs for signup
         if (type === "sign-up") {
             if (fullname.length < 3) {
                 return toast.error("Fullname must be at least 3 letters long");
@@ -68,19 +67,21 @@ const UserAuthForm = ({ type }) => {
                 return toast.error("Invalid Email");
             }
             if (!passwordRegex.test(password)) {
-                return toast.error("Password should be 6 to 20 characters long with a numeric, 1 lowercase and 1 uppercase letter");
+                return toast.error(
+                    "Password should be 6 to 20 characters long with a numeric, 1 lowercase and 1 uppercase letter"
+                );
             }
             if (password !== confirmPassword) {
                 return toast.error("Passwords do not match");
             }
 
-            // Request OTP
-            axios.post(import.meta.env.VITE_SERVER_DOMAIN + "/request-otp", { email, type })
+            axios
+                .post(import.meta.env.VITE_SERVER_DOMAIN + "/request-otp", { email, type: "signup" })
                 .then(({ data }) => {
                     toast.success(data.message);
                     setOtpSent(true);
                 })
-                .catch(err => {
+                .catch((err) => {
                     toast.error(err.response?.data.error || "Failed to send OTP");
                 });
         }
@@ -94,7 +95,6 @@ const UserAuthForm = ({ type }) => {
 
         const { email, password } = formData;
 
-        // Validate inputs for signin
         if (type === "sign-in") {
             if (!email) {
                 return toast.error("Enter Email");
@@ -102,12 +102,9 @@ const UserAuthForm = ({ type }) => {
             if (!emailRegex.test(email)) {
                 return toast.error("Invalid Email");
             }
-            // if (!passwordRegex.test(password)) {
-            //     return toast.error("Password should be 6 to 20 characters long with a numeric, 1 lowercase and 1 uppercase letter");
-            // }
+            // Password regex validation commented out as per your code
         }
 
-        // Validate OTP for signup
         if (type === "sign-up") {
             if (!otp) {
                 return toast.error("Please enter the OTP");
@@ -121,24 +118,23 @@ const UserAuthForm = ({ type }) => {
     const handleGoogleAuth = (e) => {
         e.preventDefault();
         authWithGoogle()
-            .then(user => {
-                console.log(user);
+            .then((user) => {
                 let serverRoute = "/google-auth";
                 let formData = {
                     access_token: user.access_token
                 };
                 userAuthThroughServer(serverRoute, formData);
             })
-            .catch(err => {
-                toast.error('trouble login through google');
+            .catch((err) => {
+                toast.error("Trouble logging in through Google");
                 return console.log(err);
             });
     };
 
     return (
-        access_token ?
+        access_token ? (
             <Navigate to="/" />
-            :
+        ) : (
             <AnimationWrapper keyValue={type}>
                 <section className="h-cover flex items-center justify-center">
                     <Toaster />
@@ -165,6 +161,11 @@ const UserAuthForm = ({ type }) => {
                                     value={formData.password}
                                     onChange={handleChange}
                                 />
+                                <p className="text-dark-grey text-sm text-right mt-2">
+                                    <Link to="/forgot-password" className="underline">
+                                        Forgot Password?
+                                    </Link>
+                                </p>
                                 <button className="btn-dark center mt-14" type="submit">
                                     Sign In
                                 </button>
@@ -273,6 +274,7 @@ const UserAuthForm = ({ type }) => {
                     </form>
                 </section>
             </AnimationWrapper>
+        )
     );
 };
 
