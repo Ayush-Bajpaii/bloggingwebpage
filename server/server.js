@@ -728,7 +728,7 @@ server.post('/update-profile', verifyJWT ,(req,res) => {
         return res.status(200).json({ username })
     })
     .catch(err => {
-        if(err.code == 1100){
+        if(err.code == 11000){
             return res.status(409).json({ error: "Username is already taken" })
         }
         return res.status(500).json({ error: err.message })
