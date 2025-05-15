@@ -1151,6 +1151,21 @@ server.post("/delete-blog", verifyJWT,(req,res) => {
     })
 })
 
+server.get("/get-tags", async (req, res) => {
+    try {
+      const blogs = await Blog.find({ draft: false })
+        .sort({ publishedAt: -1 })
+        .select("tags -_id");
+      const tags = blogs
+        .filter(blog => blog.tags && blog.tags.length > 0)
+        .map(blog => blog.tags[0]); // Take first tag
+      return res.status(200).json({ tags });
+    } catch (err) {
+      console.error("Error fetching tags:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
 
 // Start the server (with binding to 0.0.0.0 for mobile access)
 server.listen(PORT, '0.0.0.0', () => {
