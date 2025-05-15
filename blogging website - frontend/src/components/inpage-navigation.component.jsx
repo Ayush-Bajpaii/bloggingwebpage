@@ -61,7 +61,7 @@ const InPageNavigation = ({ routes, defaultHidden = [], defaultActiveIndex = 0, 
                     })
                 }
 
-                <hr ref={activeTabLineRef} className="absolute bottom-0 duration-300 " />
+                <hr ref={activeTabLineRef} className="absolute bottom-0 border-black duration-300 " />
             </div>
 
             {Array.isArray(children) ? children[inPageNavIndex] : children}
