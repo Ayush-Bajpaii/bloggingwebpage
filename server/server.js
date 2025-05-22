@@ -1152,19 +1152,27 @@ server.post("/delete-blog", verifyJWT,(req,res) => {
 })
 
 server.get("/get-tags", async (req, res) => {
-    try {
-      const blogs = await Blog.find({ draft: false })
-        .sort({ publishedAt: -1 })
-        .select("tags -_id");
-      const tags = blogs
-        .filter(blog => blog.tags && blog.tags.length > 0)
-        .map(blog => blog.tags[0]); // Take first tag
-      return res.status(200).json({ tags });
-    } catch (err) {
-      console.error("Error fetching tags:", err);
-      return res.status(500).json({ error: err.message });
-    }
-  });
+  try {
+    // Fetch published blogs and select only the tags field
+    const blogs = await Blog.find({ draft: false })
+      .sort({ publishedAt: -1 })
+      .select("tags -_id");
+
+    // Extract the first tag from each blog and deduplicate using Set
+    const firstTags = blogs
+      .filter(blog => blog.tags && blog.tags.length > 0)
+      .map(blog => blog.tags[0]); // Take first tag
+    const uniqueFirstTags = [...new Set(firstTags)]; // Deduplicate tags
+
+    // Sort tags alphabetically for consistent display
+    uniqueFirstTags.sort();
+
+    return res.status(200).json({ tags: uniqueFirstTags });
+  } catch (err) {
+    console.error("Error fetching tags:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 
 // Start the server (with binding to 0.0.0.0 for mobile access)
