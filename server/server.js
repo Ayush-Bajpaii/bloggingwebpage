@@ -737,13 +737,12 @@ server.post('/update-profile', verifyJWT ,(req,res) => {
 })
 
 
-// Create Blog route (common in both files)
-server.post('/create-blog', verifyJWT, (req, res) => {
+server.post('/create-blog', verifyJWT, async (req, res) => {
     let authorId = req.user;
     let { title, des, banner, tags, content, draft, id } = req.body;
 
     if (!title.length) {
-        return res.status(403).json({ error: "You must provide a title" }); // Fixed status code (4013 to 403)
+        return res.status(403).json({ error: "You must provide a title" });
     }
 
     if (!draft) {
@@ -763,31 +762,72 @@ server.post('/create-blog', verifyJWT, (req, res) => {
 
     tags = tags.map(tag => tag.toLowerCase());
     let blog_id = id || title.replace(/[^a-zA-Z0-9]/g, ' ').replace(/\s+/g, "-").trim() + nanoid();
-    if (id) {
-        Blog.findOneAndUpdate({ blog_id }, { title, des, banner, tags, content, draft: draft ? draft : false })
-            .then(() => {
-                return res.status(200).json({ id: Blog.blog_id })
-            })
-            .catch(err => {
-                return res.status(500).json({ error: err.message })
-            })
 
+    if (id) {
+        try {
+            // Find the existing blog
+            const existingBlog = await Blog.findOne({ blog_id });
+            if (!existingBlog) {
+                return res.status(404).json({ error: "Blog not found" });
+            }
+
+            // Check if the blog is transitioning from draft to published
+            const isPublishing = existingBlog.draft && !draft;
+
+            // Prepare update object
+            const updateObj = {
+                title,
+                des,
+                banner,
+                tags,
+                content,
+                draft: draft ? draft : false,
+            };
+
+            // Set publishedAt if publishing
+            if (isPublishing) {
+                updateObj.publishedAt = new Date();
+            }
+
+            // Update the blog
+            await Blog.findOneAndUpdate({ blog_id }, updateObj);
+
+            // If publishing, increment user's total_posts
+            if (isPublishing) {
+                await User.findOneAndUpdate(
+                    { _id: authorId },
+                    { $inc: { "account_info.total_posts": 1 } }
+                );
+            }
+
+            return res.status(200).json({ id: blog_id });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
     } else {
         let blog = new Blog({
-            title, des, banner, content, tags, author: authorId, blog_id, draft: Boolean(draft)
+            title,
+            des,
+            banner,
+            content,
+            tags,
+            author: authorId,
+            blog_id,
+            draft: Boolean(draft),
+            publishedAt: draft ? null : new Date(), // Set publishedAt for new non-draft blogs
         });
 
-        blog.save()
-            .then(blog => {
-                let incrementVal = draft ? 0 : 1;
-                User.findOneAndUpdate(
-                    { _id: authorId },
-                    { $inc: { "account_info.total_posts": incrementVal }, $push: { "blogs": blog._id } }
-                )
-                    .then(user => res.status(200).json({ id: blog.blog_id }))
-                    .catch(err => res.status(500).json({ error: "Failed to update total posts number" }));
-            })
-            .catch(err => res.status(500).json({ error: err.message }));
+        try {
+            const savedBlog = await blog.save();
+            let incrementVal = draft ? 0 : 1;
+            await User.findOneAndUpdate(
+                { _id: authorId },
+                { $inc: { "account_info.total_posts": incrementVal }, $push: { blogs: savedBlog._id } }
+            );
+            return res.status(200).json({ id: savedBlog.blog_id });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
     }
 });
 
